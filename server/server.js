@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const path = require('path');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -22,6 +23,10 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// Serve static files from client build
+const clientBuildPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientBuildPath));
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/clients', require('./routes/clientRoutes'));
@@ -31,6 +36,11 @@ app.use('/api/interactions', require('./routes/interactionRoutes'));
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'EIRS CRM API is running', timestamp: new Date() });
+});
+
+// Serve index.html for SPA routing (must be before error handler)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 
 // Error Handler Middleware (must be last)

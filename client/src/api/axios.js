@@ -1,10 +1,17 @@
 import axios from 'axios';
 
-// Use environment variable for API URL, fallback to relative path for development
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+// Determine API base URL based on environment
+const getAPIUrl = () => {
+  // In development, use relative path (proxied by Vite)
+  if (import.meta.env.MODE === 'development') {
+    return '/api';
+  }
+  // In production on Vercel, use the Render backend
+  return 'https://eirs-technology-crm.onrender.com/api';
+};
 
 const API = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getAPIUrl(),
   headers: { 'Content-Type': 'application/json' },
 });
 

@@ -2,9 +2,6 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "outputDirectory": "dist",
-  "env": {
-    "VITE_API_URL": "@eirs-api-url"
-  },
   "rewrites": [
     {
       "source": "/(.*)",

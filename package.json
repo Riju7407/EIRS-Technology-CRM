@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "description": "EIRS CRM - Full Stack MERN Application",
   "scripts": {
-    "start": "npm --prefix server start",
+    "start": "cd server && npm install && npm start",
     "server": "npm --prefix server run dev",
     "client": "cd client && npm run dev",
     "dev": "start cmd /k \"cd server && npm run dev\" && start cmd /k \"cd client && npm run dev\"",
     "install-all": "cd server && npm install && cd ../client && npm install"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": "18.x || 20.x || 22.x",
+    "npm": "9.x || 10.x"
+  }
 }

@@ -3,6 +3,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -23,9 +24,15 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Serve static files from client build
-const clientBuildPath = path.join(__dirname, '../client/dist');
-app.use(express.static(clientBuildPath));
+// Determine the correct path for client build
+// Works both locally and on Render
+const clientBuildPath = path.resolve(__dirname, '../client/dist');
+
+// Serve static files from client build if it exists
+if (fs.existsSync(clientBuildPath)) {
+  app.use(express.static(clientBuildPath));
+  console.log(`Serving static files from ${clientBuildPath}`);
+}
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -39,9 +46,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve index.html for SPA routing (must be before error handler)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(clientBuildPath, 'index.html'));
-});
+if (fs.existsSync(clientBuildPath)) {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 // Error Handler Middleware (must be last)
 app.use(errorHandler);

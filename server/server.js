@@ -5,13 +5,11 @@ const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/db');
+const bootstrapAdminFromEnv = require('./config/bootstrapAdmin');
 const errorHandler = require('./middleware/errorHandler');
 
 // Load env vars
 dotenv.config();
-
-// Connect to Database
-connectDB();
 
 const app = express();
 
@@ -39,6 +37,10 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/clients', require('./routes/clientRoutes'));
 app.use('/api/followups', require('./routes/followUpRoutes'));
 app.use('/api/interactions', require('./routes/interactionRoutes'));
+app.use('/api/prospects', require('./routes/prospectRoutes'));
+app.use('/api/employees', require('./routes/employeeRoutes'));
+app.use('/api/distribution', require('./routes/distributionRoutes'));
+app.use('/api/campaigns', require('./routes/campaignRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -57,14 +59,30 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
-  console.log(`EIRS CRM Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+let server;
+
+const startServer = async () => {
+  await connectDB();
+  await bootstrapAdminFromEnv();
+
+  server = app.listen(PORT, () => {
+    console.log(`EIRS CRM Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  });
+};
+
+startServer().catch((err) => {
+  console.error(`Server startup failed: ${err.message}`);
+  process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error(`Unhandled Rejection: ${err.message}`);
-  server.close(() => process.exit(1));
+  if (server) {
+    server.close(() => process.exit(1));
+  } else {
+    process.exit(1);
+  }
 });
 
 module.exports = app;

@@ -10,6 +10,10 @@ import ClientsPage from './pages/ClientsPage';
 import ClientDetailPage from './pages/ClientDetailPage';
 import FollowUpsPage from './pages/FollowUpsPage';
 import InteractionsPage from './pages/InteractionsPage';
+import ProspectsPage from './pages/ProspectsPage';
+import EmployeesPage from './pages/EmployeesPage';
+import DistributionPage from './pages/DistributionPage';
+import CampaignsPage from './pages/CampaignsPage';
 
 function App() {
   return (
@@ -38,6 +42,10 @@ function App() {
             <Route path="clients/:id" element={<ClientDetailPage />} />
             <Route path="followups" element={<FollowUpsPage />} />
             <Route path="interactions" element={<InteractionsPage />} />
+            <Route path="prospects" element={<ProspectsPage />} />
+            <Route path="employees" element={<EmployeesPage />} />
+            <Route path="distribution" element={<DistributionPage />} />
+            <Route path="campaigns" element={<CampaignsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

@@ -1,4 +1,58 @@
 const Client = require('../models/Client');
+const XLSX = require('xlsx');
+
+const VALID_STATUSES = ['active', 'inactive', 'lead', 'prospect', 'churned'];
+const VALID_SOURCES = ['referral', 'website', 'social_media', 'cold_call', 'market', 'other'];
+
+const toSafeString = (value) => (value === undefined || value === null ? '' : String(value).trim());
+const toLower = (value) => toSafeString(value).toLowerCase();
+
+const normalizeStatus = (value) => {
+  const status = toLower(value);
+  return VALID_STATUSES.includes(status) ? status : 'lead';
+};
+
+const normalizeSource = (value) => {
+  const source = toLower(value).replace(/[\s-]+/g, '_');
+  return VALID_SOURCES.includes(source) ? source : 'other';
+};
+
+const splitName = (name) => {
+  const normalized = toSafeString(name);
+  if (!normalized) return { firstName: '', lastName: '' };
+
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (!parts.length) return { firstName: '', lastName: '' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '-' };
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  };
+};
+
+const mapExcelRowToClient = (row) => {
+  const firstName = toSafeString(row.firstName || row['First Name']);
+  const lastName = toSafeString(row.lastName || row['Last Name']);
+  const fullName = toSafeString(row.name || row.Name);
+  const nameParts = splitName(fullName);
+
+  return {
+    firstName: firstName || nameParts.firstName,
+    lastName: lastName || nameParts.lastName,
+    email: toLower(row.email || row.Email),
+    phone: toSafeString(row.phone || row.Phone),
+    alternatePhone: toSafeString(row.alternatePhone || row['Alternate Phone']),
+    company: toSafeString(row.company || row.Company),
+    status: normalizeStatus(row.status || row.Status),
+    source: normalizeSource(row.source || row.Source),
+    notes: toSafeString(row.notes || row.Notes),
+    tags: toSafeString(row.tags || row.Tags)
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  };
+};
 
 // @desc    Get all clients
 // @route   GET /api/clients
@@ -149,5 +203,117 @@ exports.getClientStats = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Import clients from Excel
+// @route   POST /api/clients/import
+// @access  Private/Admin
+exports.importClientsFromExcel = async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, message: 'Excel file is required' });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const firstSheet = workbook.SheetNames[0];
+
+    if (!firstSheet) {
+      return res.status(400).json({ success: false, message: 'Excel file has no sheets' });
+    }
+
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { defval: '' });
+    if (!rows.length) {
+      return res.status(400).json({ success: false, message: 'Excel sheet is empty' });
+    }
+
+    let created = 0;
+    let updated = 0;
+    const skipped = [];
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      const payload = mapExcelRowToClient(row);
+
+      if (!payload.firstName || !payload.lastName || !payload.email || !payload.phone) {
+        skipped.push({ row: index + 2, reason: 'Missing required fields: firstName, lastName, email or phone' });
+        continue;
+      }
+
+      const emailRegex = /^\S+@\S+\.\S+$/;
+      if (!emailRegex.test(payload.email)) {
+        skipped.push({ row: index + 2, reason: 'Invalid email format' });
+        continue;
+      }
+
+      const existingClient = await Client.findOne({ email: payload.email });
+      if (existingClient) {
+        const updatePayload = {
+          ...payload,
+          isDeleted: false,
+          tags: payload.tags.length ? payload.tags : existingClient.tags,
+          alternatePhone: payload.alternatePhone || existingClient.alternatePhone,
+          company: payload.company || existingClient.company,
+          notes: payload.notes || existingClient.notes,
+        };
+        await Client.findByIdAndUpdate(existingClient._id, updatePayload, { runValidators: true });
+        updated += 1;
+      } else {
+        await Client.create(payload);
+        created += 1;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Client import completed',
+      summary: {
+        totalRows: rows.length,
+        created,
+        updated,
+        skipped: skipped.length,
+      },
+      skipped,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Export clients to Excel
+// @route   GET /api/clients/export
+// @access  Private/Admin
+exports.exportClientsToExcel = async (req, res) => {
+  try {
+    const clients = await Client.find({ isDeleted: false }).sort({ createdAt: -1 }).lean();
+
+    const excelRows = clients.map((client) => ({
+      firstName: client.firstName,
+      lastName: client.lastName,
+      email: client.email,
+      phone: client.phone,
+      alternatePhone: client.alternatePhone || '',
+      company: client.company || '',
+      status: client.status,
+      source: client.source,
+      totalPurchaseValue: client.totalPurchaseValue || 0,
+      notes: client.notes || '',
+      tags: Array.isArray(client.tags) ? client.tags.join(', ') : '',
+      createdAt: client.createdAt,
+      updatedAt: client.updatedAt,
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Clients');
+
+    const fileBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const fileName = `clients-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return res.status(200).send(fileBuffer);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

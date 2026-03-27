@@ -8,4 +8,12 @@ export const clientService = {
   delete: (id) => API.delete(`/clients/${id}`),
   addPurchase: (id, data) => API.post(`/clients/${id}/purchase`, data),
   getStats: () => API.get('/clients/stats'),
+  importExcel: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return API.post('/clients/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  exportExcel: () => API.get('/clients/export', { responseType: 'blob' }),
 };

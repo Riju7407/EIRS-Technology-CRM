@@ -8,6 +8,10 @@ const pageTitles = {
   '/clients': 'Client Management',
   '/followups': 'Follow-Up Scheduling',
   '/interactions': 'Interaction Logs',
+  '/prospects': 'Prospects Management',
+  '/employees': 'Employees Management',
+  '/distribution': 'Distribution Management',
+  '/campaigns': 'Campaigns Management',
 };
 
 const Navbar = () => {

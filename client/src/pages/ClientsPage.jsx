@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPlus, FiEdit2, FiTrash2, FiEye, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiEye, FiSearch, FiUpload, FiDownload } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { clientService } from '../services/clientService';
 import Spinner from '../components/common/Spinner';
@@ -15,9 +15,11 @@ const ClientsPage = () => {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [fileLoading, setFileLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
   const [filters, setFilters] = useState({ search: '', status: '', page: 1, limit: 10 });
+  const fileInputRef = useRef(null);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -48,6 +50,63 @@ const ClientsPage = () => {
   const openCreate = () => { setEditData(null); setShowForm(true); };
   const openEdit = (client) => { setEditData(client); setShowForm(true); };
 
+  const triggerUpload = () => {
+    if (fileLoading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleExcelUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+    if (!isExcel) {
+      toast.error('Please upload a valid Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    setFileLoading(true);
+    try {
+      const { data } = await clientService.importExcel(file);
+      const { summary } = data;
+      toast.success(
+        `Import complete: ${summary.created} created, ${summary.updated} updated, ${summary.skipped} skipped`
+      );
+      fetchClients();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Excel import failed');
+    }
+    setFileLoading(false);
+  };
+
+  const handleExcelDownload = async () => {
+    if (fileLoading) return;
+
+    setFileLoading(true);
+    try {
+      const response = await clientService.exportExcel();
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const fileName = `clients-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Client Excel downloaded');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Excel download failed');
+    }
+    setFileLoading(false);
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -55,9 +114,28 @@ const ClientsPage = () => {
           <h1>Client Management</h1>
           <p>Manage and track all your customer records</p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
-          <FiPlus /> Add Client
-        </button>
+        <div className="client-actions">
+          {isAdmin && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={handleExcelUpload}
+              />
+              <button className="btn btn-secondary" onClick={triggerUpload} disabled={fileLoading}>
+                <FiUpload /> Upload Excel
+              </button>
+              <button className="btn btn-secondary" onClick={handleExcelDownload} disabled={fileLoading}>
+                <FiDownload /> Download Excel
+              </button>
+            </>
+          )}
+          <button className="btn btn-primary" onClick={openCreate}>
+            <FiPlus /> Add Client
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   FiHome, FiUsers, FiCalendar, FiMessageSquare,
-  FiBarChart2, FiSettings,
+  FiUserPlus, FiBriefcase, FiPackage, FiTarget,
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 
@@ -11,6 +11,10 @@ const navItems = [
   { to: '/clients', label: 'Clients', icon: FiUsers },
   { to: '/followups', label: 'Follow-Ups', icon: FiCalendar },
   { to: '/interactions', label: 'Interactions', icon: FiMessageSquare },
+  { to: '/prospects', label: 'Prospects', icon: FiUserPlus },
+  { to: '/employees', label: 'Employees', icon: FiBriefcase },
+  { to: '/distribution', label: 'Distribution', icon: FiPackage },
+  { to: '/campaigns', label: 'Campaigns', icon: FiTarget },
 ];
 
 const Sidebar = () => {

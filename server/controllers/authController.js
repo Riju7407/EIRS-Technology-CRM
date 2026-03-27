@@ -6,13 +6,14 @@ const User = require('../models/User');
 exports.register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
-    const user = await User.create({ name, email, password, role });
+    const user = await User.create({ name, email: normalizedEmail, password, role });
     const token = user.getSignedJwtToken();
 
     res.status(201).json({
@@ -32,12 +33,13 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user || !user.isActive) {
       return res.status(401).json({ success: false, message: 'Invalid credentials or account deactivated' });
     }

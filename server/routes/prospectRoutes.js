@@ -2,16 +2,14 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const {
-  getClients,
-  getClientById,
-  createClient,
-  updateClient,
-  deleteClient,
-  addPurchase,
-  getClientStats,
-  importClientsFromExcel,
-  exportClientsToExcel,
-} = require('../controllers/clientController');
+  getProspects,
+  createProspect,
+  updateProspect,
+  deleteProspect,
+  getProspectStats,
+  importProspectsFromExcel,
+  exportProspectsToExcel,
+} = require('../controllers/prospectController');
 const { protect, authorize } = require('../middleware/auth');
 
 const upload = multer({
@@ -46,19 +44,10 @@ const uploadImportFile = (req, res, next) => {
   });
 };
 
-// Stats route MUST come before /:id routes
-router.get('/stats', protect, getClientStats);
-router.get('/export', protect, authorize('admin'), exportClientsToExcel);
-router.post('/import', protect, authorize('admin'), uploadImportFile, importClientsFromExcel);
-
-router.route('/').get(protect, getClients).post(protect, createClient);
-
-router
-  .route('/:id')
-  .get(protect, getClientById)
-  .put(protect, updateClient)
-  .delete(protect, authorize('admin'), deleteClient);
-
-router.post('/:id/purchase', protect, addPurchase);
+router.get('/stats', protect, getProspectStats);
+router.get('/export', protect, authorize('admin'), exportProspectsToExcel);
+router.post('/import', protect, authorize('admin'), uploadImportFile, importProspectsFromExcel);
+router.route('/').get(protect, getProspects).post(protect, createProspect);
+router.route('/:id').put(protect, updateProspect).delete(protect, authorize('admin'), deleteProspect);
 
 module.exports = router;

@@ -38,6 +38,7 @@ app.use('/api/clients', require('./routes/clientRoutes'));
 app.use('/api/followups', require('./routes/followUpRoutes'));
 app.use('/api/interactions', require('./routes/interactionRoutes'));
 app.use('/api/prospects', require('./routes/prospectRoutes'));
+app.use('/api/service-management', require('./routes/prospectRoutes'));
 app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/distribution', require('./routes/distributionRoutes'));
 app.use('/api/campaigns', require('./routes/campaignRoutes'));

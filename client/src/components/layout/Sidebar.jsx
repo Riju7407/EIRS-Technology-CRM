@@ -2,16 +2,19 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   FiHome, FiUsers, FiCalendar, FiMessageSquare,
-  FiUserPlus, FiBriefcase, FiPackage, FiTarget,
+  FiUserPlus, FiBriefcase, FiPackage, FiTarget, FiFileText, FiShoppingBag,
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: FiHome },
   { to: '/clients', label: 'Clients', icon: FiUsers },
+  { to: '/customer-details', label: 'Customer Details', icon: FiUsers },
+  { to: '/purchase-history', label: 'Purchase History', icon: FiShoppingBag },
+  { to: '/bill-quotation', label: 'Bill Quotation', icon: FiFileText },
   { to: '/followups', label: 'Follow-Ups', icon: FiCalendar },
   { to: '/interactions', label: 'Interactions', icon: FiMessageSquare },
-  { to: '/prospects', label: 'Prospects', icon: FiUserPlus },
+  { to: '/service-management', label: 'Service Management', icon: FiUserPlus },
   { to: '/employees', label: 'Employees', icon: FiBriefcase },
   { to: '/distribution', label: 'Distribution', icon: FiPackage },
   { to: '/campaigns', label: 'Campaigns', icon: FiTarget },

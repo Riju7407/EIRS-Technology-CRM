@@ -96,10 +96,10 @@ const DistributionPage = () => {
 
       if (editData?._id) {
         await distributionService.update(editData._id, payload);
-        toast.success('Lead assignment updated successfully');
+        toast.success('Service assignment updated successfully');
       } else {
         await distributionService.create(payload);
-        toast.success('Lead assigned successfully');
+        toast.success('Service request assigned successfully');
       }
       setShowForm(false);
       fetchData();
@@ -140,11 +140,11 @@ const DistributionPage = () => {
       <div className="page-header">
         <div>
           <h1>Distribution Management</h1>
-          <p>Prospect Distribution (Efficiently distribute leads to your team and track assignment history.)</p>
+          <p>Service Request Distribution (Efficiently distribute requests to your team and track assignment history.)</p>
         </div>
         {isAdmin && (
           <button className="btn btn-primary" onClick={openCreate}>
-            <FiPlus /> Assign Lead
+            <FiPlus /> Assign Request
           </button>
         )}
       </div>
@@ -194,7 +194,7 @@ const DistributionPage = () => {
           <input
             className="form-control search-input"
             style={{ paddingLeft: 34 }}
-            placeholder="Search by assignment, prospect, or employee..."
+            placeholder="Search by assignment, service request, or employee..."
             value={filters.search}
             onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value, page: 1 }))}
           />
@@ -221,7 +221,7 @@ const DistributionPage = () => {
                 <thead>
                   <tr>
                     <th>Assignment ID</th>
-                    <th>Prospect</th>
+                    <th>Service Request</th>
                     <th>Assigned To</th>
                     <th>Assigned By</th>
                     <th>Status</th>
@@ -283,7 +283,7 @@ const DistributionPage = () => {
       <Modal
         isOpen={showForm}
         onClose={() => setShowForm(false)}
-        title={editData ? 'Edit Lead Assignment' : 'Assign Prospect Lead'}
+        title={editData ? 'Edit Service Assignment' : 'Assign Service Request'}
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
@@ -294,9 +294,9 @@ const DistributionPage = () => {
         <form id="distribution-form" onSubmit={onSubmit}>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Prospect</label>
+              <label className="form-label">Service Request</label>
               <select className="form-control" required value={formData.prospect} onChange={(e) => setFormData((p) => ({ ...p, prospect: e.target.value }))}>
-                <option value="">Select Prospect</option>
+                <option value="">Select Service Request</option>
                 {prospectOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}

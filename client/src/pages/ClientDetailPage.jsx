@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FiArrowLeft, FiEdit2, FiPlus, FiPhone, FiMail, FiMapPin } from 'react-icons/fi';
+import { FiArrowLeft, FiEdit2, FiFileText, FiPlus, FiShoppingBag, FiPhone, FiMail, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { clientService } from '../services/clientService';
 import { interactionService } from '../services/interactionService';
@@ -44,6 +44,26 @@ const ClientDetailPage = () => {
 
   return (
     <div>
+      <div className="card sticky-breadcrumb" style={{ marginBottom: 14 }}>
+        <div className="card-body sticky-breadcrumb-body" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, color: 'var(--text-secondary)' }}>
+            <Link to="/customer-details" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>Customer Details</Link>
+            <span>/</span>
+            <Link to="/clients" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>Clients</Link>
+            <span>/</span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{client.firstName} {client.lastName}</span>
+          </div>
+          <div className="client-actions">
+            <Link className="btn btn-secondary btn-sm" to="/purchase-history">
+              <FiShoppingBag size={14} /> Purchase History
+            </Link>
+            <Link className="btn btn-primary btn-sm" to="/bill-quotation">
+              <FiFileText size={14} /> Bill Quotation
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <Link to="/clients" className="btn btn-secondary btn-icon">

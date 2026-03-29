@@ -11,6 +11,9 @@ import ClientDetailPage from './pages/ClientDetailPage';
 import FollowUpsPage from './pages/FollowUpsPage';
 import InteractionsPage from './pages/InteractionsPage';
 import ProspectsPage from './pages/ProspectsPage';
+import BillQuotationPage from './pages/BillQuotationPage';
+import CustomerDetailsPage from './pages/CustomerDetailsPage';
+import PurchaseHistoryPage from './pages/PurchaseHistoryPage';
 import EmployeesPage from './pages/EmployeesPage';
 import DistributionPage from './pages/DistributionPage';
 import CampaignsPage from './pages/CampaignsPage';
@@ -40,9 +43,13 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="clients" element={<ClientsPage />} />
             <Route path="clients/:id" element={<ClientDetailPage />} />
+            <Route path="customer-details" element={<CustomerDetailsPage />} />
+            <Route path="purchase-history" element={<PurchaseHistoryPage />} />
+            <Route path="bill-quotation" element={<BillQuotationPage />} />
             <Route path="followups" element={<FollowUpsPage />} />
             <Route path="interactions" element={<InteractionsPage />} />
-            <Route path="prospects" element={<ProspectsPage />} />
+            <Route path="service-management" element={<ProspectsPage />} />
+            <Route path="prospects" element={<Navigate to="/service-management" replace />} />
             <Route path="employees" element={<EmployeesPage />} />
             <Route path="distribution" element={<DistributionPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />

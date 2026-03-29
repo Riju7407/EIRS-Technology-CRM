@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FiDownload, FiEdit2, FiPlus, FiSearch, FiTrash2, FiTrendingUp, FiUpload, FiUserCheck, FiUsers } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import Spinner from '../components/common/Spinner';
@@ -45,7 +46,7 @@ const ProspectsPage = () => {
       setTotalPages(Number(listRes?.data?.totalPages) || 1);
       setStats(statsRes.data.stats);
     } catch (_) {
-      toast.error('Failed to load prospects');
+      toast.error('Failed to load service requests');
     }
     setLoading(false);
   }, [filters]);
@@ -86,23 +87,23 @@ const ProspectsPage = () => {
 
       if (editData?._id) {
         await prospectService.update(editData._id, payload);
-        toast.success('Prospect updated successfully');
+        toast.success('Service request updated successfully');
       } else {
         await prospectService.create(payload);
-        toast.success('Prospect added successfully');
+        toast.success('Service request added successfully');
       }
       setShowForm(false);
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save prospect');
+      toast.error(err.response?.data?.message || 'Failed to save service request');
     }
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete prospect "${name}"?`)) return;
+    if (!window.confirm(`Delete service request "${name}"?`)) return;
     try {
       await prospectService.delete(id);
-      toast.success('Prospect deleted successfully');
+      toast.success('Service request deleted successfully');
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Delete failed');
@@ -159,7 +160,7 @@ const ProspectsPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('Prospects Excel downloaded');
+      toast.success('Service requests Excel downloaded');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Excel download failed');
     }
@@ -172,10 +173,13 @@ const ProspectsPage = () => {
     <div>
       <div className="page-header">
         <div>
-          <h1>Prospects</h1>
-          <p>Track potential customers across your acquisition pipeline</p>
+          <h1>Service Management</h1>
+          <p>Manage pipeline-stage service opportunities and delivery readiness</p>
         </div>
         <div className="client-actions">
+          <Link className="btn btn-secondary" to="/distribution">Distribution</Link>
+          <Link className="btn btn-secondary" to="/bill-quotation">Bill Quotation</Link>
+          <Link className="btn btn-secondary" to="/purchase-history">Purchase History</Link>
           {isAdmin && (
             <>
               <input
@@ -194,7 +198,7 @@ const ProspectsPage = () => {
             </>
           )}
           <button className="btn btn-primary" onClick={openCreate}>
-            <FiPlus /> Add Prospect
+            <FiPlus /> Add Service Request
           </button>
         </div>
       </div>
@@ -206,7 +210,7 @@ const ProspectsPage = () => {
           </div>
           <div className="stat-info">
             <h4>{stats?.total ?? 0}</h4>
-            <p>Total Prospects</p>
+            <p>Total Service Requests</p>
           </div>
         </div>
         <div className="stat-card">
@@ -235,7 +239,7 @@ const ProspectsPage = () => {
           <input
             className="form-control search-input"
             style={{ paddingLeft: 34 }}
-            placeholder="Search prospects..."
+            placeholder="Search service requests..."
             value={filters.search}
             onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value, page: 1 }))}
           />
@@ -296,14 +300,14 @@ const ProspectsPage = () => {
                       </td>
                     </tr>
                   )) : (
-                    <tr><td colSpan={7}><div className="empty-state"><h3>No prospects found</h3></div></td></tr>
+                    <tr><td colSpan={7}><div className="empty-state"><h3>No service requests found</h3></div></td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
             <div className="pagination">
-              <span>Showing {prospectsList.length} of {total} prospects</span>
+              <span>Showing {prospectsList.length} of {total} service requests</span>
               <div className="pagination-controls">
                 <button className="btn btn-secondary btn-sm" disabled={filters.page <= 1} onClick={() => setFilters((p) => ({ ...p, page: p.page - 1 }))}>Previous</button>
                 <span style={{ padding: '5px 10px', fontSize: 13 }}>Page {filters.page} of {totalPages}</span>
@@ -317,7 +321,7 @@ const ProspectsPage = () => {
       <Modal
         isOpen={showForm}
         onClose={() => setShowForm(false)}
-        title={editData ? 'Edit Prospect' : 'Add Prospect'}
+        title={editData ? 'Edit Service Request' : 'Add Service Request'}
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>

@@ -8,6 +8,7 @@ const {
   updateClient,
   deleteClient,
   addPurchase,
+  updatePurchaseStatus,
   getClientStats,
   importClientsFromExcel,
   exportClientsToExcel,
@@ -53,12 +54,15 @@ router.post('/import', protect, authorize('admin'), uploadImportFile, importClie
 
 router.route('/').get(protect, getClients).post(protect, createClient);
 
+// More specific nested routes MUST come before /:id route
+router.post('/:id/purchase', protect, addPurchase);
+router.put('/:id/purchase/:purchaseIndex', protect, updatePurchaseStatus);
+
+// Generic :id route comes last
 router
   .route('/:id')
   .get(protect, getClientById)
   .put(protect, updateClient)
   .delete(protect, authorize('admin'), deleteClient);
-
-router.post('/:id/purchase', protect, addPurchase);
 
 module.exports = router;

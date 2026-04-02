@@ -77,7 +77,7 @@ exports.getClients = async (req, res) => {
 
     const total = await Client.countDocuments(query);
     const clients = await Client.find(query)
-      .populate('assignedTo', 'name email')
+      .populate('assignedTo', 'name email role region')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));
@@ -176,6 +176,42 @@ exports.addPurchase = async (req, res) => {
     client.purchaseHistory.push(req.body);
     await client.save();
     res.status(201).json({ success: true, message: 'Purchase added', client });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update purchase status in client
+// @route   PUT /api/clients/:id/purchase/:purchaseIndex
+// @access  Private
+exports.updatePurchaseStatus = async (req, res) => {
+  try {
+    const { id, purchaseIndex } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['pending', 'completed', 'cancelled', 'refunded'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    const client = await Client.findOne({ _id: id, isDeleted: false });
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    const index = parseInt(purchaseIndex);
+    if (index < 0 || index >= client.purchaseHistory.length) {
+      return res.status(404).json({ success: false, message: 'Purchase not found' });
+    }
+
+    client.purchaseHistory[index].status = status;
+    await client.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Purchase status updated',
+      purchase: client.purchaseHistory[index]
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

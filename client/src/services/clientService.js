@@ -7,6 +7,7 @@ export const clientService = {
   update: (id, data) => API.put(`/clients/${id}`, data),
   delete: (id) => API.delete(`/clients/${id}`),
   addPurchase: (id, data) => API.post(`/clients/${id}/purchase`, data),
+  updatePurchaseStatus: (clientId, purchaseIndex, status) => API.put(`/clients/${clientId}/purchase/${purchaseIndex}`, { status }),
   getStats: () => API.get('/clients/stats'),
   importExcel: (file) => {
     const formData = new FormData();

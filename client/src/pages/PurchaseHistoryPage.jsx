@@ -22,6 +22,7 @@ const PurchaseHistoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(null);
   const [purchase, setPurchase] = useState(defaultPurchase);
   const [filters, setFilters] = useState({ search: '', status: '' });
 
@@ -82,6 +83,19 @@ const PurchaseHistoryPage = () => {
   const resetForm = () => {
     setPurchase(defaultPurchase);
     setShowModal(false);
+  };
+
+  const handleStatusChange = async (itemId, newStatus) => {
+    const [clientId, index] = itemId.split('-');
+    setUpdatingStatus(itemId);
+    try {
+      await clientService.updatePurchaseStatus(clientId, index, newStatus);
+      toast.success('Purchase status updated');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update status');
+    }
+    setUpdatingStatus(null);
   };
 
   const savePurchase = async (event) => {
@@ -212,7 +226,20 @@ const PurchaseHistoryPage = () => {
                     <td style={{ fontWeight: 600 }}>Rs {item.amount.toLocaleString()}</td>
                     <td>{item.invoiceNumber}</td>
                     <td>{item.date ? format(new Date(item.date), 'dd MMM yyyy') : 'N/A'}</td>
-                    <td><StatusBadge value={item.status} /></td>
+                    <td>
+                      <select
+                        className="form-control"
+                        style={{ minWidth: 100, padding: '4px 8px', fontSize: '0.875rem' }}
+                        value={item.status}
+                        onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                        disabled={updatingStatus === item.id}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="refunded">Refunded</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </td>
                     <td>{item.notes || 'N/A'}</td>
                     <td>
                       <Link className="btn btn-secondary btn-icon btn-sm" to={`/clients/${item.clientId}`} title="Open customer profile">

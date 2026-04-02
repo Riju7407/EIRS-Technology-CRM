@@ -19,8 +19,10 @@ const ClientForm = ({ isOpen, onClose, editData, onSaved }) => {
 
   useEffect(() => {
     if (isOpen) {
-      // Load agents
-      API.get('/auth/users').then(({ data }) => setAgents(data.users || [])).catch(() => {});
+      // Load employees from the Employee model
+      API.get('/employees', { params: { status: 'active', limit: 500 } })
+        .then(({ data }) => setAgents(data.employees || []))
+        .catch(() => toast.error('Failed to load employees'));
     }
     if (editData) {
       setForm({
@@ -143,12 +145,18 @@ const ClientForm = ({ isOpen, onClose, editData, onSaved }) => {
           </div>
         </div>
         <div className="form-group">
-          <label className="form-label">Assign To</label>
+          <label className="form-label">Assign To (Employee)</label>
           <select className="form-control" name="assignedTo" value={form.assignedTo || ''} onChange={handleChange}>
-            <option value="">-- Select Agent --</option>
-            {agents.map((a) => (
-              <option key={a._id} value={a._id}>{a.name} ({a.role})</option>
-            ))}
+            <option value="">-- Select Employee --</option>
+            {agents.length > 0 ? (
+              agents.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.name} ({a.role || 'Employee'}){a.region ? ` - ${a.region}` : ''}
+                </option>
+              ))
+            ) : (
+              <option disabled>No employees available</option>
+            )}
           </select>
         </div>
         <div className="form-group">

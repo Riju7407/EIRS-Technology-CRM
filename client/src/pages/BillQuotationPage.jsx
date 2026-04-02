@@ -1,20 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiFileText, FiPlus, FiShoppingBag, FiTrash2, FiUsers } from 'react-icons/fi';
+import { FiDownload, FiFileText, FiPlus, FiShoppingBag, FiTrash2, FiUsers } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { clientService } from '../services/clientService';
 import Spinner from '../components/common/Spinner';
+import { useAuth } from '../context/AuthContext';
 
 const createQuoteNumber = () => {
-  const datePart = format(new Date(), 'yyyyMMdd');
-  const randomPart = Math.floor(100 + Math.random() * 900);
-  return `Q-${datePart}-${randomPart}`;
+  const now = new Date();
+  const year = now.getFullYear();
+  const nextYearShort = String((year + 1) % 100).padStart(2, '0');
+  const currentYearShort = String(year % 100).padStart(2, '0');
+  const sequence = Math.floor(100 + Math.random() * 900);
+  return `EIRS/${currentYearShort}-${nextYearShort}/${sequence}`;
 };
 
 const blankItem = { description: '', quantity: 1, rate: 0 };
 
+const COMPANY = {
+  name: 'EIRS TECHNOLOGY',
+  address: '568/168 BARABIRWA LDA COLONY BARABIRWA KANPUR ROAD NEAR PICADLY HOTEL',
+  mob: '9250448391, 9455304151',
+  gstin: '09LSWPS0858P1Z4',
+  email: 'eirstech@gmail.com',
+  ifsc: 'SBIN0016730',
+  accountNo: '39855113661',
+  bank: 'State Bank of India, KANPUR ROAD, LUCKNOW',
+};
+
+const formatRupees = (value) => Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
 const BillQuotationPage = () => {
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,6 +125,149 @@ const BillQuotationPage = () => {
     setItems([blankItem]);
   };
 
+  const downloadQuotationPdf = () => {
+    if (!selectedClientId) {
+      toast.error('Select a customer before downloading quotation PDF');
+      return;
+    }
+
+    const validItems = items.filter((item) => item.description && Number(item.quantity) > 0);
+    if (!validItems.length) {
+      toast.error('Add at least one item before downloading PDF');
+      return;
+    }
+
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(16);
+    pdf.text('QUOTATION', centerX, 40, { align: 'center' });
+
+    pdf.setFontSize(14);
+    pdf.text(COMPANY.name, centerX, 62, { align: 'center' });
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(COMPANY.address, centerX, 80, { align: 'center' });
+
+    pdf.setFontSize(9.5);
+    pdf.text(`MOB- ${COMPANY.mob}`, 40, 100);
+    pdf.text(`GSTIN- ${COMPANY.gstin}`, pageWidth - 210, 100);
+    pdf.text(`EMAIL- ${COMPANY.email}`, 40, 116);
+    pdf.text(`QUOTATION NO- ${quoteNumber}`, pageWidth - 240, 116);
+
+    const clientName = selectedClient
+      ? `${selectedClient.firstName || ''} ${selectedClient.lastName || ''}`.trim()
+      : '';
+    const clientAddress = [
+      selectedClient?.address?.street,
+      selectedClient?.address?.city,
+      selectedClient?.address?.state,
+      selectedClient?.address?.zipCode,
+      selectedClient?.address?.country,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('NAME-', 40, 145);
+    pdf.text('MOB. NO.-', 320, 145);
+    pdf.text(format(new Date(), 'dd-MM-yyyy'), pageWidth - 90, 145);
+    pdf.text('ADDRESS-', 40, 162);
+    pdf.text('QUOTATION DATE', 320, 162);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(clientName || '-', 85, 145);
+    pdf.text(selectedClient?.phone || '-', 380, 145);
+    pdf.text(clientAddress || '-', 95, 162);
+
+    autoTable(pdf, {
+      startY: 178,
+      head: [['S NO.', 'PRODUCT', 'DESCRIPTION', 'QTY', 'PRICE', 'AMOUNT']],
+      body: validItems.map((item, index) => {
+        const quantity = Number(item.quantity || 0);
+        const price = Number(item.rate || 0);
+        return [
+          String(index + 1),
+          item.description,
+          notes || '-',
+          String(quantity),
+          formatRupees(price),
+          formatRupees(quantity * price),
+        ];
+      }),
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 4, lineColor: [35, 35, 35], lineWidth: 0.3 },
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 40 },
+        1: { cellWidth: 130 },
+        2: { cellWidth: 120 },
+        3: { cellWidth: 45, halign: 'right' },
+        4: { cellWidth: 70, halign: 'right' },
+        5: { cellWidth: 75, halign: 'right' },
+      },
+      margin: { left: 40, right: 40 },
+    });
+
+    const tableEndY = pdf.lastAutoTable?.finalY || 300;
+    const summaryY = tableEndY + 18;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('SUBTOTAL', 40, summaryY);
+    pdf.text(formatRupees(computed.total), pageWidth - 40, summaryY, { align: 'right' });
+
+    const detailTop = summaryY + 28;
+    const boxWidth = (pageWidth - 100) / 2;
+    const leftX = 40;
+    const rightX = leftX + boxWidth + 20;
+    const boxHeight = 160;
+    pdf.rect(leftX, detailTop, boxWidth, boxHeight);
+    pdf.rect(rightX, detailTop, boxWidth, boxHeight);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('TERM AND CONDITION', leftX + boxWidth / 2, detailTop + 16, { align: 'center' });
+    pdf.text('BANK DETAIL', rightX + boxWidth / 2, detailTop + 16, { align: 'center' });
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    const terms = [
+      '1. Goods once sold will not be taken or exchanged.',
+      '2. All disputes are subject to Lucknow jurisdiction only.',
+      "3. We don't take personal warranty of any item.",
+      '4. All warranty and replacement is done by authorized company.',
+    ];
+    let termY = detailTop + 34;
+    terms.forEach((line) => {
+      pdf.text(line, leftX + 8, termY, { maxWidth: boxWidth - 16 });
+      termY += 18;
+    });
+
+    pdf.text(`Name: ${COMPANY.name}`, rightX + 8, detailTop + 36, { maxWidth: boxWidth - 16 });
+    pdf.text(`IFSC Code: ${COMPANY.ifsc}`, rightX + 8, detailTop + 54);
+    pdf.text(`Account No. ${COMPANY.accountNo}`, rightX + 8, detailTop + 72);
+    pdf.text(`Bank: ${COMPANY.bank}`, rightX + 8, detailTop + 90, { maxWidth: boxWidth - 16 });
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Signatory for', pageWidth - 140, detailTop + 130);
+    pdf.text(COMPANY.name, pageWidth - 140, detailTop + 146);
+
+    const footerStart = detailTop + boxHeight + 22;
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('BRAND PARTNER', centerX, footerStart, { align: 'center' });
+    pdf.text('OTHER BRANCHES', centerX, footerStart + 18, { align: 'center' });
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.text('OFFICE NO. 9 BHAIRAV COMPLEX, ALAMBAGH BUS STOP, LUCKNOW, UP-226005', centerX, footerStart + 36, { align: 'center' });
+    pdf.text('OFFICE-3 - SHOP NO 260, LEKHRAJ MARKET-3 INDIRA NAGAR LUCKNOW NEAR LEKHRAJ METRO STATION', centerX, footerStart + 50, { align: 'center' });
+
+    pdf.save(`${quoteNumber}.pdf`);
+    toast.success('Quotation PDF downloaded');
+  };
+
   if (loading) {
     return <Spinner text="Loading quotation module..." />;
   }
@@ -125,6 +288,9 @@ const BillQuotationPage = () => {
           </Link>
           <button className="btn btn-secondary" onClick={resetQuote}>New Quote</button>
           <button className="btn btn-secondary" onClick={() => window.print()}>Print</button>
+          <button className="btn btn-secondary" onClick={downloadQuotationPdf}>
+            <FiDownload /> {isAdmin ? 'Download PDF (Admin)' : 'Download PDF'}
+          </button>
           <button className="btn btn-primary" onClick={saveAsPurchase} disabled={saving}>
             {saving ? 'Saving...' : 'Save As Purchase'}
           </button>

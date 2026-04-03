@@ -12,6 +12,7 @@ import FollowUpsPage from './pages/FollowUpsPage';
 import InteractionsPage from './pages/InteractionsPage';
 import ProspectsPage from './pages/ProspectsPage';
 import BillQuotationPage from './pages/BillQuotationPage';
+import SavedQuotationsPage from './pages/SavedQuotationsPage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import PurchaseHistoryPage from './pages/PurchaseHistoryPage';
 import EmployeesPage from './pages/EmployeesPage';
@@ -46,6 +47,7 @@ function App() {
             <Route path="customer-details" element={<CustomerDetailsPage />} />
             <Route path="purchase-history" element={<PurchaseHistoryPage />} />
             <Route path="bill-quotation" element={<BillQuotationPage />} />
+            <Route path="saved-quotations" element={<SavedQuotationsPage />} />
             <Route path="followups" element={<FollowUpsPage />} />
             <Route path="interactions" element={<InteractionsPage />} />
             <Route path="service-management" element={<ProspectsPage />} />

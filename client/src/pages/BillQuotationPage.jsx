@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiDownload, FiFileText, FiPlus, FiShoppingBag, FiTrash2, FiUsers } from 'react-icons/fi';
+import { FiDownload, FiFileText, FiPlus, FiShoppingBag, FiTrash2, FiUsers, FiSave } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { clientService } from '../services/clientService';
+import { quotationService } from '../services/quotationService';
 import Spinner from '../components/common/Spinner';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,7 +32,33 @@ const COMPANY = {
   bank: 'State Bank of India, KANPUR ROAD, LUCKNOW',
 };
 
+const BRAND_PARTNER_LOGOS = [
+  'https://res.cloudinary.com/dfitjwwws/image/upload/q_auto/f_auto/v1771049898/essl_yqrq00.png',
+  'https://res.cloudinary.com/dfitjwwws/image/upload/q_auto/f_auto/v1771049857/secureye_sdesva.png',
+  'https://res.cloudinary.com/dfitjwwws/image/upload/q_auto/f_auto/v1771049791/matrix_hg8ewh.png',
+  'https://res.cloudinary.com/dfitjwwws/image/upload/q_auto/f_auto/v1771049710/beelet_lxbfh3.png',
+  'https://res.cloudinary.com/dfitjwwws/image/upload/q_auto/f_auto/v1771049649/hikvision_i8oipb.png',
+  'https://res.cloudinary.com/dfitjwwws/image/upload/q_auto/f_auto/v1771049516/cp_plus_xgmoke.png',
+  'https://res.cloudinary.com/dfitjwwws/image/upload/q_auto/f_auto/v1771049612/dahua_ftbmkx.png',
+];
+
 const formatRupees = (value) => Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+// Helper function to fetch image from URL and convert to data URL
+const fetchImageAsDataURL = async (imageUrl) => {
+  try {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error fetching image:', error);
+    return null;
+  }
+};
 
 const BillQuotationPage = () => {
   const { isAdmin } = useAuth();
@@ -116,6 +143,59 @@ const BillQuotationPage = () => {
     setSaving(false);
   };
 
+  const saveQuotation = async () => {
+    if (!selectedClientId) {
+      toast.error('Select a customer before saving quotation');
+      return;
+    }
+
+    const validItems = items.filter((item) => item.description && Number(item.quantity) > 0 && Number(item.rate) >= 0);
+    if (!validItems.length) {
+      toast.error('Add at least one valid quotation item');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const quotationData = {
+        quoteNumber,
+        clientId: selectedClientId,
+        items: validItems,
+        discount: Number(discount || 0),
+        taxPercent: Number(taxPercent || 0),
+        notes,
+        subtotal: Number(computed.subtotal.toFixed(2)),
+        taxAmount: Number(computed.taxAmount.toFixed(2)),
+        total: Number(computed.total.toFixed(2)),
+        pdfData: {
+          quoteNumber,
+          clientName: selectedClient ? `${selectedClient.firstName || ''} ${selectedClient.lastName || ''}`.trim() : '',
+          clientPhone: selectedClient?.phone,
+          clientAddress: [
+            selectedClient?.address?.street,
+            selectedClient?.address?.city,
+            selectedClient?.address?.state,
+            selectedClient?.address?.zipCode,
+          ]
+            .filter(Boolean)
+            .join(', '),
+          items: validItems,
+          discount,
+          taxPercent,
+          notes,
+          total: computed.total,
+        },
+      };
+
+      await quotationService.create(quotationData);
+      toast.success('Quotation saved successfully');
+      resetQuote();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save quotation');
+    }
+    setSaving(false);
+  };
+
   const resetQuote = () => {
     setQuoteNumber(createQuoteNumber());
     setSelectedClientId('');
@@ -125,7 +205,7 @@ const BillQuotationPage = () => {
     setItems([blankItem]);
   };
 
-  const downloadQuotationPdf = () => {
+  const downloadQuotationPdf = async () => {
     if (!selectedClientId) {
       toast.error('Select a customer before downloading quotation PDF');
       return;
@@ -139,18 +219,42 @@ const BillQuotationPage = () => {
 
     const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
     const centerX = pageWidth / 2;
+
+    // Add watermark
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(30); // Reduced from 60
+    pdf.setTextColor(230, 230, 230); // Very light gray
+    
+    // Add watermark text at 45-degree angle, repeated across the page with larger gaps
+    for (let x = -pageWidth; x < pageWidth * 2; x += 300) { // Increased gap from 200 to 300
+      for (let y = -100; y < pageHeight + 100; y += 220) { // Increased gap from 150 to 220
+        pdf.text('EIRS Technology', x, y, { angle: 45 });
+      }
+    }
+    
+    // Reset color for main content
+    pdf.setTextColor(0, 0, 0);
+
+    // Add colored header background
+    pdf.setFillColor(41, 128, 185); // Professional blue
+    pdf.rect(0, 30, pageWidth, 45, 'F');
 
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(16);
-    pdf.text('QUOTATION', centerX, 40, { align: 'center' });
+    pdf.setTextColor(255, 255, 255); // White text
+    pdf.text('QUOTATION', centerX, 48, { align: 'center' });
 
+    // Display company name in white for better visibility
+    pdf.setTextColor(255, 255, 255); // White color
     pdf.setFontSize(14);
-    pdf.text(COMPANY.name, centerX, 62, { align: 'center' });
+    pdf.text(COMPANY.name, centerX, 70, { align: 'center' });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
-    pdf.text(COMPANY.address, centerX, 80, { align: 'center' });
+    pdf.setTextColor(0, 0, 0); // Black
+    pdf.text(COMPANY.address, centerX, 88, { align: 'center' });
 
     pdf.setFontSize(9.5);
     pdf.text(`MOB- ${COMPANY.mob}`, 40, 100);
@@ -200,7 +304,7 @@ const BillQuotationPage = () => {
       }),
       theme: 'grid',
       styles: { fontSize: 9, cellPadding: 4, lineColor: [35, 35, 35], lineWidth: 0.3 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
+      headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255], fontStyle: 'bold' },
       columnStyles: {
         0: { cellWidth: 40 },
         1: { cellWidth: 130 },
@@ -215,7 +319,9 @@ const BillQuotationPage = () => {
     const tableEndY = pdf.lastAutoTable?.finalY || 300;
     const summaryY = tableEndY + 18;
     pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(41, 128, 185); // Blue color
     pdf.text('SUBTOTAL', 40, summaryY);
+    pdf.setTextColor(0, 0, 0); // Black
     pdf.text(formatRupees(computed.total), pageWidth - 40, summaryY, { align: 'right' });
 
     const detailTop = summaryY + 28;
@@ -223,16 +329,27 @@ const BillQuotationPage = () => {
     const leftX = 40;
     const rightX = leftX + boxWidth + 20;
     const boxHeight = 160;
+    
+    // Add colored backgrounds to boxes
+    pdf.setFillColor(230, 240, 250); // Very light blue
+    pdf.rect(leftX, detailTop, boxWidth, boxHeight, 'F');
+    pdf.rect(rightX, detailTop, boxWidth, boxHeight, 'F');
+    
+    // Draw borders
+    pdf.setDrawColor(41, 128, 185); // Blue borders
+    pdf.setLineWidth(1);
     pdf.rect(leftX, detailTop, boxWidth, boxHeight);
     pdf.rect(rightX, detailTop, boxWidth, boxHeight);
 
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(10);
+    pdf.setTextColor(41, 128, 185); // Blue text
     pdf.text('TERM AND CONDITION', leftX + boxWidth / 2, detailTop + 16, { align: 'center' });
     pdf.text('BANK DETAIL', rightX + boxWidth / 2, detailTop + 16, { align: 'center' });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
+    pdf.setTextColor(0, 0, 0); // Black text
     const terms = [
       '1. Goods once sold will not be taken or exchanged.',
       '2. All disputes are subject to Lucknow jurisdiction only.',
@@ -256,13 +373,37 @@ const BillQuotationPage = () => {
 
     const footerStart = detailTop + boxHeight + 22;
     pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(41, 128, 185); // Blue color
     pdf.text('BRAND PARTNER', centerX, footerStart, { align: 'center' });
-    pdf.text('OTHER BRANCHES', centerX, footerStart + 18, { align: 'center' });
+    
+    // Add brand partner logos
+    const logoY = footerStart + 12;
+    const logoHeight = 30;
+    const logoWidth = 40;
+    const totalLogosWidth = BRAND_PARTNER_LOGOS.length * logoWidth + (BRAND_PARTNER_LOGOS.length - 1) * 8; // 8pt gap
+    const startX = centerX - totalLogosWidth / 2;
+    
+    for (let i = 0; i < BRAND_PARTNER_LOGOS.length; i++) {
+      const imageDataUrl = await fetchImageAsDataURL(BRAND_PARTNER_LOGOS[i]);
+      if (imageDataUrl) {
+        try {
+          const xPos = startX + i * (logoWidth + 8);
+          pdf.addImage(imageDataUrl, 'PNG', xPos, logoY, logoWidth, logoHeight);
+        } catch (error) {
+          console.error(`Error adding image ${i}:`, error);
+        }
+      }
+    }
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(41, 128, 185); // Blue color
+    pdf.text('OTHER BRANCHES', centerX, footerStart + 55, { align: 'center' });
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.5);
-    pdf.text('OFFICE NO. 9 BHAIRAV COMPLEX, ALAMBAGH BUS STOP, LUCKNOW, UP-226005', centerX, footerStart + 36, { align: 'center' });
-    pdf.text('OFFICE-3 - SHOP NO 260, LEKHRAJ MARKET-3 INDIRA NAGAR LUCKNOW NEAR LEKHRAJ METRO STATION', centerX, footerStart + 50, { align: 'center' });
+    pdf.setTextColor(0, 0, 0); // Black text
+    pdf.text('OFFICE NO. 9 BHAIRAV COMPLEX, ALAMBAGH BUS STOP, LUCKNOW, UP-226005', centerX, footerStart + 73, { align: 'center' });
+    pdf.text('OFFICE-3 - SHOP NO 260, LEKHRAJ MARKET-3 INDIRA NAGAR LUCKNOW NEAR LEKHRAJ METRO STATION', centerX, footerStart + 87, { align: 'center' });
 
     pdf.save(`${quoteNumber}.pdf`);
     toast.success('Quotation PDF downloaded');
@@ -286,10 +427,18 @@ const BillQuotationPage = () => {
           <Link className="btn btn-secondary" to="/purchase-history">
             <FiShoppingBag /> Purchase History
           </Link>
+          {isAdmin && (
+            <Link className="btn btn-secondary" to="/saved-quotations">
+              <FiFileText /> Saved Quotations
+            </Link>
+          )}
           <button className="btn btn-secondary" onClick={resetQuote}>New Quote</button>
           <button className="btn btn-secondary" onClick={() => window.print()}>Print</button>
           <button className="btn btn-secondary" onClick={downloadQuotationPdf}>
-            <FiDownload /> {isAdmin ? 'Download PDF (Admin)' : 'Download PDF'}
+            <FiDownload /> Download PDF
+          </button>
+          <button className="btn btn-primary" onClick={saveQuotation} disabled={saving}>
+            <FiSave /> {saving ? 'Saving...' : 'Save Quotation'}
           </button>
           <button className="btn btn-primary" onClick={saveAsPurchase} disabled={saving}>
             {saving ? 'Saving...' : 'Save As Purchase'}

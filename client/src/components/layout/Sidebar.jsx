@@ -2,16 +2,17 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   FiHome, FiUsers, FiCalendar, FiMessageSquare,
-  FiUserPlus, FiBriefcase, FiPackage, FiTarget, FiFileText, FiShoppingBag,
+  FiUserPlus, FiBriefcase, FiPackage, FiTarget, FiFileText, FiShoppingBag, FiDownload,
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 
-const navItems = [
+const getNavItems = (isAdmin) => [
   { to: '/dashboard', label: 'Dashboard', icon: FiHome },
   { to: '/clients', label: 'Clients', icon: FiUsers },
   { to: '/customer-details', label: 'Customer Details', icon: FiUsers },
   { to: '/purchase-history', label: 'Purchase History', icon: FiShoppingBag },
   { to: '/bill-quotation', label: 'Bill Quotation', icon: FiFileText },
+  ...(isAdmin ? [{ to: '/saved-quotations', label: 'Saved Quotations', icon: FiDownload }] : []),
   { to: '/followups', label: 'Follow-Ups', icon: FiCalendar },
   { to: '/interactions', label: 'Interactions', icon: FiMessageSquare },
   { to: '/service-management', label: 'Service Management', icon: FiUserPlus },
@@ -21,7 +22,8 @@ const navItems = [
 ];
 
 const Sidebar = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
+  const navItems = getNavItems(isAdmin);
 
   return (
     <aside className="sidebar">

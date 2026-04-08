@@ -69,7 +69,11 @@ const startServer = async () => {
   started = true;
 
   await connectDB();
-  await bootstrapAdminFromEnv();
+
+  const shouldBootstrapAdmin = process.env.ENABLE_ADMIN_BOOTSTRAP === 'true' || !process.env.VERCEL;
+  if (shouldBootstrapAdmin) {
+    await bootstrapAdminFromEnv();
+  }
 
   // In Vercel serverless runtime, do not bind a listening socket.
   if (process.env.VERCEL) {

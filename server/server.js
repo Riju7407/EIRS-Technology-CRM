@@ -62,10 +62,20 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 let server;
+let started = false;
 
 const startServer = async () => {
+  if (started) return;
+  started = true;
+
   await connectDB();
   await bootstrapAdminFromEnv();
+
+  // In Vercel serverless runtime, do not bind a listening socket.
+  if (process.env.VERCEL) {
+    console.log('EIRS CRM running in Vercel serverless mode');
+    return;
+  }
 
   server = app.listen(PORT, () => {
     console.log(`EIRS CRM Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
@@ -74,7 +84,9 @@ const startServer = async () => {
 
 startServer().catch((err) => {
   console.error(`Server startup failed: ${err.message}`);
-  process.exit(1);
+  if (!process.env.VERCEL) {
+    process.exit(1);
+  }
 });
 
 // Handle unhandled promise rejections

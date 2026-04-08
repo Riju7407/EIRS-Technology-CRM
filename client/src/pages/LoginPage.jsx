@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { prefetchPostLoginRoutes } from '../utils/routePrefetch';
 
 const LoginPage = () => {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -10,7 +11,10 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const result = await login(form.email, form.password);
-    if (result.success) navigate('/dashboard');
+    if (result.success) {
+      prefetchPostLoginRoutes();
+      navigate('/dashboard');
+    }
   };
 
   return (

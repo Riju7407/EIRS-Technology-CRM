@@ -9,12 +9,12 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          utils: ['axios', 'date-fns'],
-          pdf: ['jspdf', 'jspdf-autotable'],
-          icons: ['react-icons'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'react';
+          if (id.includes('node_modules/react-router-dom')) return 'router';
+          if (id.includes('node_modules/axios') || id.includes('node_modules/date-fns')) return 'utils';
+          if (id.includes('node_modules/jspdf') || id.includes('node_modules/jspdf-autotable')) return 'pdf';
+          if (id.includes('node_modules/react-icons')) return 'icons';
         },
       },
     },

@@ -28,7 +28,7 @@ const ProspectsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
   const [formData, setFormData] = useState(initialForm);
-  const [filters, setFilters] = useState({ search: '', stage: '', page: 1, limit: 10 });
+  const [filters, setFilters] = useState({ search: '', stage: '', source: '', page: 1, limit: 10 });
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const fileInputRef = useRef(null);
@@ -174,7 +174,7 @@ const ProspectsPage = () => {
       <div className="page-header">
         <div>
           <h1>Service Management</h1>
-          <p>Manage pipeline-stage service opportunities and delivery readiness</p>
+          <p>Manage pipeline-stage service opportunities and delivery readiness (website enquiries appear with source: website)</p>
         </div>
         <div className="client-actions">
           <Link className="btn btn-secondary" to="/distribution">Distribution</Link>
@@ -252,6 +252,16 @@ const ProspectsPage = () => {
           <option value="">All Stages</option>
           {['new', 'qualified', 'proposal', 'negotiation', 'won', 'lost'].map((stage) => (
             <option key={stage} value={stage}>{stage}</option>
+          ))}
+        </select>
+        <select
+          className="form-control filter-select"
+          value={filters.source}
+          onChange={(e) => setFilters((p) => ({ ...p, source: e.target.value, page: 1 }))}
+        >
+          <option value="">All Sources</option>
+          {['website', 'referral', 'social_media', 'cold_call', 'market', 'other'].map((source) => (
+            <option key={source} value={source}>{source.replace('_', ' ')}</option>
           ))}
         </select>
       </div>

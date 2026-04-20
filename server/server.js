@@ -43,6 +43,7 @@ app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/distribution', require('./routes/distributionRoutes'));
 app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/quotations', require('./routes/quotationRoutes'));
+app.use('/api/website-sync', require('./routes/websiteSyncRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -70,9 +71,19 @@ const startServer = async () => {
 
   await connectDB();
 
-  const shouldBootstrapAdmin = process.env.ENABLE_ADMIN_BOOTSTRAP === 'true' || !process.env.VERCEL;
+  const hasAdminBootstrapCredentials = Boolean(
+    String(process.env.ADMIN_EMAIL || '').trim() &&
+    String(process.env.ADMIN_PASSWORD || '').trim()
+  );
+
+  const shouldBootstrapAdmin =
+    process.env.ENABLE_ADMIN_BOOTSTRAP === 'true' ||
+    hasAdminBootstrapCredentials;
+
   if (shouldBootstrapAdmin) {
     await bootstrapAdminFromEnv();
+  } else {
+    console.warn('Admin bootstrap skipped: set ADMIN_EMAIL and ADMIN_PASSWORD to enable CRM sync login');
   }
 
   // In Vercel serverless runtime, do not bind a listening socket.

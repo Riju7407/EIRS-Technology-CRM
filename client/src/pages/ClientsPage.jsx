@@ -18,7 +18,7 @@ const ClientsPage = () => {
   const [fileLoading, setFileLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
-  const [filters, setFilters] = useState({ search: '', status: '', page: 1, limit: 10 });
+  const [filters, setFilters] = useState({ search: '', status: '', source: '', page: 1, limit: 10 });
   const fileInputRef = useRef(null);
 
   const fetchClients = useCallback(async () => {
@@ -112,7 +112,7 @@ const ClientsPage = () => {
       <div className="page-header">
         <div>
           <h1>Client Management</h1>
-          <p>Manage and track all your customer records</p>
+          <p>Manage and track all your customer records (website orders sync here as source: website)</p>
         </div>
         <div className="client-actions">
           {isAdmin && (
@@ -158,6 +158,16 @@ const ClientsPage = () => {
           <option value="">All Statuses</option>
           {['lead', 'prospect', 'active', 'inactive', 'churned'].map((s) => (
             <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
+        <select
+          className="form-control filter-select"
+          value={filters.source}
+          onChange={(e) => setFilters((p) => ({ ...p, source: e.target.value, page: 1 }))}
+        >
+          <option value="">All Sources</option>
+          {['website', 'referral', 'social_media', 'cold_call', 'market', 'other'].map((source) => (
+            <option key={source} value={source}>{source.replace('_', ' ')}</option>
           ))}
         </select>
       </div>

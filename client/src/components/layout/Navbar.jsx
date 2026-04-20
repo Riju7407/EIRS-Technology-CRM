@@ -15,6 +15,10 @@ const pageTitles = {
   '/employees': 'Employees Management',
   '/distribution': 'Distribution Management',
   '/campaigns': 'Campaigns Management',
+  '/website-users': 'Website Users',
+  '/website-orders': 'Website Orders',
+  '/website-bookings': 'Website Service Bookings',
+  '/website-contacts': 'Website Contact Enquiries',
 };
 
 const Navbar = () => {

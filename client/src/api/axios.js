@@ -12,8 +12,8 @@ const getAPIUrl = () => {
     return '/api';
   }
 
-  // In production on Vercel, use the Render backend
-  return 'https://eirs-technology-crm.onrender.com/api';
+  // In production, default to deployed CRM API on Vercel
+  return 'https://eirs-technology-crm.vercel.app/api';
 };
 
 const API = axios.create({

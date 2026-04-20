@@ -26,12 +26,15 @@ const buildSearch = (search, fields) => {
   return { $or: fields.map((field) => ({ [field]: regex })) };
 };
 
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
+
+const generateExternalId = (prefix) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 exports.upsertWebsiteUser = async (req, res) => {
   try {
     const payload = req.body || {};
-    if (!payload.externalUserId) {
-      return res.status(400).json({ success: false, message: 'externalUserId is required' });
-    }
+    const externalUserId = String(payload.externalUserId || generateExternalId('manual-user'));
 
     const update = {
       name: payload.name || 'Website User',
@@ -47,7 +50,7 @@ exports.upsertWebsiteUser = async (req, res) => {
     };
 
     const user = await WebsiteUser.findOneAndUpdate(
-      { externalUserId: String(payload.externalUserId) },
+      { externalUserId },
       { $set: update },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
@@ -61,9 +64,7 @@ exports.upsertWebsiteUser = async (req, res) => {
 exports.upsertWebsiteOrder = async (req, res) => {
   try {
     const payload = req.body || {};
-    if (!payload.externalOrderId) {
-      return res.status(400).json({ success: false, message: 'externalOrderId is required' });
-    }
+    const externalOrderId = String(payload.externalOrderId || generateExternalId('manual-order'));
 
     const update = {
       externalUserId: payload.externalUserId || '',
@@ -84,7 +85,7 @@ exports.upsertWebsiteOrder = async (req, res) => {
     };
 
     const order = await WebsiteOrder.findOneAndUpdate(
-      { externalOrderId: String(payload.externalOrderId) },
+      { externalOrderId },
       { $set: update },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
@@ -98,9 +99,7 @@ exports.upsertWebsiteOrder = async (req, res) => {
 exports.upsertWebsiteBooking = async (req, res) => {
   try {
     const payload = req.body || {};
-    if (!payload.externalBookingId) {
-      return res.status(400).json({ success: false, message: 'externalBookingId is required' });
-    }
+    const externalBookingId = String(payload.externalBookingId || generateExternalId('manual-booking'));
 
     const update = {
       externalUserId: payload.externalUserId || '',
@@ -118,7 +117,7 @@ exports.upsertWebsiteBooking = async (req, res) => {
     };
 
     const booking = await WebsiteBooking.findOneAndUpdate(
-      { externalBookingId: String(payload.externalBookingId) },
+      { externalBookingId },
       { $set: update },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
@@ -132,9 +131,7 @@ exports.upsertWebsiteBooking = async (req, res) => {
 exports.upsertWebsiteContact = async (req, res) => {
   try {
     const payload = req.body || {};
-    if (!payload.externalContactId) {
-      return res.status(400).json({ success: false, message: 'externalContactId is required' });
-    }
+    const externalContactId = String(payload.externalContactId || generateExternalId('manual-contact'));
 
     const update = {
       name: payload.name || 'Website Contact',
@@ -147,7 +144,7 @@ exports.upsertWebsiteContact = async (req, res) => {
     };
 
     const contact = await WebsiteContact.findOneAndUpdate(
-      { externalContactId: String(payload.externalContactId) },
+      { externalContactId },
       { $set: update },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
@@ -284,6 +281,178 @@ exports.getWebsiteSyncStats = async (_req, res) => {
       success: true,
       stats: { users, orders, bookings, contacts, totalRevenue },
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateWebsiteUser = async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const update = { lastSyncedAt: new Date() };
+
+    if (hasOwn(payload, 'name')) update.name = payload.name || 'Website User';
+    if (hasOwn(payload, 'email')) update.email = payload.email || '';
+    if (hasOwn(payload, 'phoneNumber')) update.phoneNumber = payload.phoneNumber || '';
+    if (hasOwn(payload, 'address')) update.address = payload.address || '';
+    if (hasOwn(payload, 'city')) update.city = payload.city || '';
+    if (hasOwn(payload, 'state')) update.state = payload.state || '';
+    if (hasOwn(payload, 'pincode')) update.pincode = payload.pincode || '';
+    if (hasOwn(payload, 'isAdmin')) update.isAdmin = Boolean(payload.isAdmin);
+
+    const user = await WebsiteUser.findOneAndUpdate(
+      { _id: req.params.id, source: 'website' },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Website user not found' });
+    }
+
+    return res.status(200).json({ success: true, user });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deleteWebsiteUser = async (req, res) => {
+  try {
+    const user = await WebsiteUser.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Website user not found' });
+    }
+    return res.status(200).json({ success: true, message: 'Website user deleted' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateWebsiteOrder = async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const update = { lastSyncedAt: new Date() };
+
+    if (hasOwn(payload, 'externalUserId')) update.externalUserId = payload.externalUserId || '';
+    if (hasOwn(payload, 'customerName')) update.customerName = payload.customerName || '';
+    if (hasOwn(payload, 'customerEmail')) update.customerEmail = payload.customerEmail || '';
+    if (hasOwn(payload, 'customerPhone')) update.customerPhone = payload.customerPhone || '';
+    if (hasOwn(payload, 'totalPrice')) update.totalPrice = Number(payload.totalPrice || 0);
+    if (hasOwn(payload, 'totalItems')) update.totalItems = Number(payload.totalItems || 0);
+    if (hasOwn(payload, 'status')) update.status = payload.status || 'Pending';
+    if (hasOwn(payload, 'paymentStatus')) update.paymentStatus = payload.paymentStatus || 'Pending';
+    if (hasOwn(payload, 'paymentMethod')) update.paymentMethod = payload.paymentMethod || '';
+    if (hasOwn(payload, 'notes')) update.notes = payload.notes || '';
+    if (hasOwn(payload, 'orderDate')) update.orderDate = toDate(payload.orderDate) || new Date();
+    if (hasOwn(payload, 'items')) update.items = Array.isArray(payload.items) ? payload.items : [];
+    if (hasOwn(payload, 'shippingAddress')) update.shippingAddress = payload.shippingAddress || {};
+
+    const order = await WebsiteOrder.findOneAndUpdate(
+      { _id: req.params.id, source: 'website' },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Website order not found' });
+    }
+
+    return res.status(200).json({ success: true, order });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deleteWebsiteOrder = async (req, res) => {
+  try {
+    const order = await WebsiteOrder.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Website order not found' });
+    }
+    return res.status(200).json({ success: true, message: 'Website order deleted' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateWebsiteBooking = async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const update = { lastSyncedAt: new Date() };
+
+    if (hasOwn(payload, 'externalUserId')) update.externalUserId = payload.externalUserId || '';
+    if (hasOwn(payload, 'serviceId')) update.serviceId = payload.serviceId || '';
+    if (hasOwn(payload, 'serviceName')) update.serviceName = payload.serviceName || '';
+    if (hasOwn(payload, 'servicePrice')) update.servicePrice = Number(payload.servicePrice || 0);
+    if (hasOwn(payload, 'customerName')) update.customerName = payload.customerName || '';
+    if (hasOwn(payload, 'email')) update.email = payload.email || '';
+    if (hasOwn(payload, 'phoneNumber')) update.phoneNumber = payload.phoneNumber || '';
+    if (hasOwn(payload, 'address')) update.address = payload.address || '';
+    if (hasOwn(payload, 'preferredDate')) update.preferredDate = toDate(payload.preferredDate);
+    if (hasOwn(payload, 'notes')) update.notes = payload.notes || '';
+
+    const booking = await WebsiteBooking.findOneAndUpdate(
+      { _id: req.params.id, source: 'website' },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Website booking not found' });
+    }
+
+    return res.status(200).json({ success: true, booking });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deleteWebsiteBooking = async (req, res) => {
+  try {
+    const booking = await WebsiteBooking.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Website booking not found' });
+    }
+    return res.status(200).json({ success: true, message: 'Website booking deleted' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateWebsiteContact = async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const update = { lastSyncedAt: new Date() };
+
+    if (hasOwn(payload, 'name')) update.name = payload.name || 'Website Contact';
+    if (hasOwn(payload, 'email')) update.email = payload.email || '';
+    if (hasOwn(payload, 'phoneNumber')) update.phoneNumber = payload.phoneNumber || '';
+    if (hasOwn(payload, 'subject')) update.subject = payload.subject || '';
+    if (hasOwn(payload, 'message')) update.message = payload.message || '';
+
+    const contact = await WebsiteContact.findOneAndUpdate(
+      { _id: req.params.id, source: 'website' },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+
+    if (!contact) {
+      return res.status(404).json({ success: false, message: 'Website contact not found' });
+    }
+
+    return res.status(200).json({ success: true, contact });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deleteWebsiteContact = async (req, res) => {
+  try {
+    const contact = await WebsiteContact.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    if (!contact) {
+      return res.status(404).json({ success: false, message: 'Website contact not found' });
+    }
+    return res.status(200).json({ success: true, message: 'Website contact deleted' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

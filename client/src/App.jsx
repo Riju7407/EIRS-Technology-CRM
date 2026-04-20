@@ -25,7 +25,7 @@ const WebsiteOrdersPage = lazy(() => import('./pages/WebsiteOrdersPage'));
 const WebsiteBookingsPage = lazy(() => import('./pages/WebsiteBookingsPage'));
 const WebsiteContactsPage = lazy(() => import('./pages/WebsiteContactsPage'));
 
-const websiteSyncModulesEnabled = String(import.meta.env.VITE_ENABLE_WEBSITE_SYNC_MODULES || '').toLowerCase() === 'true';
+const websiteSyncModulesEnabled = String(import.meta.env.VITE_ENABLE_WEBSITE_SYNC_MODULES || 'true').toLowerCase() !== 'false';
 
 function App() {
   return (

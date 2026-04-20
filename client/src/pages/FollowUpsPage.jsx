@@ -26,7 +26,13 @@ const FollowUpsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editData, setEditData] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    scheduled: 0,
+    overdue: 0,
+    completed: 0,
+    pending: 0,
+    paymentDue: 0,
+  });
   const [filters, setFilters] = useState({ status: '', label: '', priority: '', page: 1, limit: 10 });
 
   const fetchData = useCallback(async () => {
@@ -36,14 +42,24 @@ const FollowUpsPage = () => {
         followUpService.getAll(filters),
         followUpService.getStats(),
       ]);
-      setFollowUps(fRes.data.followUps);
-      setTotal(fRes.data.total);
-      setTotalPages(fRes.data.totalPages);
-      setStats(sRes.data);
+      const followUpsData = fRes?.data?.followUps || [];
+      const statsPayload = sRes?.data?.stats || sRes?.data || {};
+
+      setFollowUps(Array.isArray(followUpsData) ? followUpsData : []);
+      setTotal(fRes?.data?.total || 0);
+      setTotalPages(fRes?.data?.totalPages || 1);
+      setStats({
+        scheduled: Number(statsPayload?.scheduled || 0),
+        overdue: Number(statsPayload?.overdue || 0),
+        completed: Number(statsPayload?.completed || 0),
+        pending: Number(statsPayload?.pending || 0),
+        paymentDue: Number(statsPayload?.paymentDue || 0),
+      });
     } catch (_) {
       toast.error('Failed to load follow-ups');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [filters]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -87,24 +103,22 @@ const FollowUpsPage = () => {
       </div>
 
       {/* Quick Stats */}
-      {stats && (
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', marginBottom: 20 }}>
-          {[
-            { label: 'Scheduled', value: stats.stats.scheduled, color: 'var(--info)' },
-            { label: 'Overdue', value: stats.stats.overdue, color: 'var(--danger)' },
-            { label: 'Completed', value: stats.stats.completed, color: 'var(--success)' },
-            { label: 'Pending Response', value: stats.stats.pending, color: 'var(--warning)' },
-            { label: 'Payment Due', value: stats.stats.paymentDue, color: 'var(--danger)' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="stat-card" style={{ padding: '14px 16px' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</div>
-              </div>
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', marginBottom: 20 }}>
+        {[
+          { label: 'Scheduled', value: stats.scheduled, color: 'var(--info)' },
+          { label: 'Overdue', value: stats.overdue, color: 'var(--danger)' },
+          { label: 'Completed', value: stats.completed, color: 'var(--success)' },
+          { label: 'Pending Response', value: stats.pending, color: 'var(--warning)' },
+          { label: 'Payment Due', value: stats.paymentDue, color: 'var(--danger)' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="stat-card" style={{ padding: '14px 16px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
 
       {/* Filters */}
       <div className="filters-bar">

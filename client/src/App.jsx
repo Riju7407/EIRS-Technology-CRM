@@ -25,6 +25,8 @@ const WebsiteOrdersPage = lazy(() => import('./pages/WebsiteOrdersPage'));
 const WebsiteBookingsPage = lazy(() => import('./pages/WebsiteBookingsPage'));
 const WebsiteContactsPage = lazy(() => import('./pages/WebsiteContactsPage'));
 
+const websiteSyncModulesEnabled = String(import.meta.env.VITE_ENABLE_WEBSITE_SYNC_MODULES || '').toLowerCase() === 'true';
+
 function App() {
   return (
     <AuthProvider>
@@ -62,10 +64,14 @@ function App() {
               <Route path="employees" element={<EmployeesPage />} />
               <Route path="distribution" element={<DistributionPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
-              <Route path="website-users" element={<WebsiteUsersPage />} />
-              <Route path="website-orders" element={<WebsiteOrdersPage />} />
-              <Route path="website-bookings" element={<WebsiteBookingsPage />} />
-              <Route path="website-contacts" element={<WebsiteContactsPage />} />
+              {websiteSyncModulesEnabled && (
+                <>
+                  <Route path="website-users" element={<WebsiteUsersPage />} />
+                  <Route path="website-orders" element={<WebsiteOrdersPage />} />
+                  <Route path="website-bookings" element={<WebsiteBookingsPage />} />
+                  <Route path="website-contacts" element={<WebsiteContactsPage />} />
+                </>
+              )}
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

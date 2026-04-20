@@ -6,6 +6,8 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 
+const websiteSyncModulesEnabled = String(import.meta.env.VITE_ENABLE_WEBSITE_SYNC_MODULES || '').toLowerCase() === 'true';
+
 const getNavItems = (isAdmin) => [
   { to: '/dashboard', label: 'Dashboard', icon: FiHome },
   { to: '/clients', label: 'Clients', icon: FiUsers },
@@ -19,10 +21,14 @@ const getNavItems = (isAdmin) => [
   { to: '/employees', label: 'Employees', icon: FiBriefcase },
   { to: '/distribution', label: 'Distribution', icon: FiPackage },
   { to: '/campaigns', label: 'Campaigns', icon: FiTarget },
-  { to: '/website-users', label: 'Website Users', icon: FiUsers },
-  { to: '/website-orders', label: 'Website Orders', icon: FiShoppingBag },
-  { to: '/website-bookings', label: 'Website Bookings', icon: FiCalendar },
-  { to: '/website-contacts', label: 'Website Contacts', icon: FiMail },
+  ...(websiteSyncModulesEnabled
+    ? [
+      { to: '/website-users', label: 'Website Users', icon: FiUsers },
+      { to: '/website-orders', label: 'Website Orders', icon: FiShoppingBag },
+      { to: '/website-bookings', label: 'Website Bookings', icon: FiCalendar },
+      { to: '/website-contacts', label: 'Website Contacts', icon: FiMail },
+    ]
+    : []),
 ];
 
 const Sidebar = () => {

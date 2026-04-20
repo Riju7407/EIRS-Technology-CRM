@@ -13,7 +13,7 @@ const getAPIUrl = () => {
   }
 
   // In production, default to deployed CRM API on Vercel
-  return 'https://eirs-technology-crm.vercel.app/api';
+  return 'https://eirs-technology-production.up.railway.app/api';
 };
 
 const API = axios.create({

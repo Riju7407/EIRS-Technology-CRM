@@ -25,11 +25,20 @@ const ClientsPage = () => {
     setLoading(true);
     try {
       const { data } = await clientService.getAll(filters);
-      setClients(data.clients);
-      setTotal(data.total);
-      setTotalPages(data.totalPages);
+      const clientList = Array.isArray(data?.clients)
+        ? data.clients
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
+
+      setClients(clientList);
+      setTotal(Number.isFinite(data?.total) ? data.total : clientList.length);
+      setTotalPages(Number.isFinite(data?.totalPages) ? data.totalPages : 1);
     } catch (_) {
       toast.error('Failed to load clients');
+      setClients([]);
+      setTotal(0);
+      setTotalPages(1);
     }
     setLoading(false);
   }, [filters]);

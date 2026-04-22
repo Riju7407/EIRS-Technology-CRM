@@ -17,11 +17,18 @@ const {
   getWebsiteBookings,
   getWebsiteContacts,
   getWebsiteSyncStats,
+  seedDemoData,
+  clearDemoData,
 } = require('../controllers/websiteSyncController');
 const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Public endpoints for seeding/clearing demo data (for testing only)
+router.post('/seed-demo', seedDemoData);
+router.delete('/clear-demo', clearDemoData);
+
+// Protected endpoints - require admin auth
 router.get('/stats', protect, authorize('admin'), getWebsiteSyncStats);
 router.get('/users', protect, authorize('admin'), getWebsiteUsers);
 router.get('/orders', protect, authorize('admin'), getWebsiteOrders);

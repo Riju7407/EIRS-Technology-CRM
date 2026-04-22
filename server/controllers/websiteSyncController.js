@@ -48,10 +48,19 @@ const websiteUserFilter = () => ({
   $or: [{ isAdmin: false }, { isAdmin: { $exists: false } }],
 });
 
+const userProjection = {
+  password: 0,
+  otp: 0,
+  otpExpiry: 0,
+  otpPurpose: 0,
+  resetPasswordToken: 0,
+  resetPasswordExpiry: 0,
+};
+
 exports.upsertWebsiteUser = async (req, res) => {
   try {
     const payload = req.body || {};
-    const user = await WebsiteUser.create({
+    const createdUser = await WebsiteUser.create({
       name: payload.name || 'Website User',
       email: String(payload.email || '').toLowerCase().trim(),
       phoneNumber: payload.phoneNumber || '',
@@ -62,6 +71,8 @@ exports.upsertWebsiteUser = async (req, res) => {
       isAdmin: false,
       password: payload.password || 'ChangeMe@123',
     });
+
+    const user = await WebsiteUser.findById(createdUser._id, userProjection);
 
     return res.status(201).json({ success: true, user });
   } catch (error) {
@@ -180,7 +191,7 @@ exports.getWebsiteUsers = async (req, res) => {
 
     const [total, users] = await Promise.all([
       WebsiteUser.countDocuments(filter),
-      WebsiteUser.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      WebsiteUser.find(filter, userProjection).sort({ createdAt: -1 }).skip(skip).limit(limit),
     ]);
 
     return res.status(200).json({
@@ -315,11 +326,13 @@ exports.updateWebsiteUser = async (req, res) => {
     if (hasOwn(payload, 'pincode')) update.pincode = payload.pincode || '';
     if (hasOwn(payload, 'isAdmin')) update.isAdmin = Boolean(payload.isAdmin);
 
-    const user = await WebsiteUser.findOneAndUpdate(
+    await WebsiteUser.findOneAndUpdate(
       { _id: req.params.id },
       { $set: update },
       { new: true, runValidators: true }
     );
+
+    const user = await WebsiteUser.findById(req.params.id, userProjection);
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'Website user not found' });

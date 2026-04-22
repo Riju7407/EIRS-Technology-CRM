@@ -1,7 +1,21 @@
-const WebsiteUser = require('../models/WebsiteUser');
-const WebsiteOrder = require('../models/WebsiteOrder');
-const WebsiteBooking = require('../models/WebsiteBooking');
-const WebsiteContact = require('../models/WebsiteContact');
+const mongoose = require('mongoose');
+
+// Read/write the original website collections directly.
+const WebsiteUser =
+  mongoose.models.WebsiteSourceUser ||
+  mongoose.model('WebsiteSourceUser', new mongoose.Schema({}, { strict: false, collection: 'users' }));
+
+const WebsiteOrder =
+  mongoose.models.WebsiteSourceOrder ||
+  mongoose.model('WebsiteSourceOrder', new mongoose.Schema({}, { strict: false, collection: 'orders' }));
+
+const WebsiteBooking =
+  mongoose.models.WebsiteSourceBooking ||
+  mongoose.model('WebsiteSourceBooking', new mongoose.Schema({}, { strict: false, collection: 'servicebookings' }));
+
+const WebsiteContact =
+  mongoose.models.WebsiteSourceContact ||
+  mongoose.model('WebsiteSourceContact', new mongoose.Schema({}, { strict: false, collection: 'contacts' }));
 
 const toPositiveInt = (value, fallback) => {
   const parsed = Number(value);
@@ -28,34 +42,28 @@ const buildSearch = (search, fields) => {
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
-const generateExternalId = (prefix) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const generateExternalId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const websiteUserFilter = () => ({
+  $or: [{ isAdmin: false }, { isAdmin: { $exists: false } }],
+});
 
 exports.upsertWebsiteUser = async (req, res) => {
   try {
     const payload = req.body || {};
-    const externalUserId = String(payload.externalUserId || generateExternalId('manual-user'));
-
-    const update = {
+    const user = await WebsiteUser.create({
       name: payload.name || 'Website User',
-      email: payload.email || '',
+      email: String(payload.email || '').toLowerCase().trim(),
       phoneNumber: payload.phoneNumber || '',
       address: payload.address || '',
       city: payload.city || '',
       state: payload.state || '',
       pincode: payload.pincode || '',
-      isAdmin: Boolean(payload.isAdmin),
-      source: payload.source || 'website',
-      lastSyncedAt: new Date(),
-    };
+      isAdmin: false,
+      password: payload.password || 'ChangeMe@123',
+    });
 
-    const user = await WebsiteUser.findOneAndUpdate(
-      { externalUserId },
-      { $set: update },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    );
-
-    return res.status(200).json({ success: true, user });
+    return res.status(201).json({ success: true, user });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -64,33 +72,49 @@ exports.upsertWebsiteUser = async (req, res) => {
 exports.upsertWebsiteOrder = async (req, res) => {
   try {
     const payload = req.body || {};
-    const externalOrderId = String(payload.externalOrderId || generateExternalId('manual-order'));
+    let userId = payload.userId;
+    if (!userId) {
+      const fallbackUser = await WebsiteUser.findOne(websiteUserFilter()).sort({ createdAt: 1 });
+      if (!fallbackUser) {
+        return res.status(400).json({ success: false, message: 'No website users found. Create a website user first.' });
+      }
+      userId = fallbackUser._id;
+    }
 
-    const update = {
-      externalUserId: payload.externalUserId || '',
-      customerName: payload.customerName || '',
-      customerEmail: payload.customerEmail || '',
-      customerPhone: payload.customerPhone || '',
-      totalPrice: Number(payload.totalPrice || 0),
-      totalItems: Number(payload.totalItems || 0),
+    const totalPrice = Number(payload.totalPrice || 0);
+    const totalItems = Number(payload.totalItems || 1);
+    const itemQuantity = Math.max(totalItems, 1);
+    const unitPrice = itemQuantity > 0 ? totalPrice / itemQuantity : totalPrice;
+
+    const order = await WebsiteOrder.create({
+      userId,
+      items: Array.isArray(payload.items) && payload.items.length > 0
+        ? payload.items
+        : [
+            {
+              productId: new mongoose.Types.ObjectId(),
+              productName: 'Manual CRM Entry',
+              price: Number.isFinite(unitPrice) ? unitPrice : 0,
+              quantity: itemQuantity,
+            },
+          ],
+      totalPrice,
+      totalItems,
       status: payload.status || 'Pending',
       paymentStatus: payload.paymentStatus || 'Pending',
-      paymentMethod: payload.paymentMethod || '',
+      paymentMethod: payload.paymentMethod || 'CashOnDelivery',
       notes: payload.notes || '',
+      customerEmail: payload.customerEmail || '',
+      customerPhone: payload.customerPhone || '',
       orderDate: toDate(payload.orderDate) || new Date(),
-      items: Array.isArray(payload.items) ? payload.items : [],
-      shippingAddress: payload.shippingAddress || {},
-      source: payload.source || 'website',
-      lastSyncedAt: new Date(),
-    };
+      shippingAddress: {
+        fullName: payload.customerName || 'Website Customer',
+        email: payload.customerEmail || '',
+        phone: payload.customerPhone || '',
+      },
+    });
 
-    const order = await WebsiteOrder.findOneAndUpdate(
-      { externalOrderId },
-      { $set: update },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    );
-
-    return res.status(200).json({ success: true, order });
+    return res.status(201).json({ success: true, order });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -99,30 +123,30 @@ exports.upsertWebsiteOrder = async (req, res) => {
 exports.upsertWebsiteBooking = async (req, res) => {
   try {
     const payload = req.body || {};
-    const externalBookingId = String(payload.externalBookingId || generateExternalId('manual-booking'));
+    let userId = payload.userId;
+    if (!userId) {
+      const fallbackUser = await WebsiteUser.findOne(websiteUserFilter()).sort({ createdAt: 1 });
+      if (!fallbackUser) {
+        return res.status(400).json({ success: false, message: 'No website users found. Create a website user first.' });
+      }
+      userId = fallbackUser._id;
+    }
 
-    const update = {
-      externalUserId: payload.externalUserId || '',
-      serviceId: payload.serviceId || '',
-      serviceName: payload.serviceName || '',
+    const booking = await WebsiteBooking.create({
+      userId,
+      serviceId: payload.serviceId || new mongoose.Types.ObjectId(),
+      serviceName: payload.serviceName || 'Website Service',
       servicePrice: Number(payload.servicePrice || 0),
-      customerName: payload.customerName || '',
-      email: payload.email || '',
+      customerName: payload.customerName || 'Website Customer',
       phoneNumber: payload.phoneNumber || '',
+      email: payload.email || '',
       address: payload.address || '',
       preferredDate: toDate(payload.preferredDate),
       notes: payload.notes || '',
-      source: payload.source || 'website',
-      lastSyncedAt: new Date(),
-    };
+      status: payload.status || 'Pending',
+    });
 
-    const booking = await WebsiteBooking.findOneAndUpdate(
-      { externalBookingId },
-      { $set: update },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    );
-
-    return res.status(200).json({ success: true, booking });
+    return res.status(201).json({ success: true, booking });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -131,25 +155,15 @@ exports.upsertWebsiteBooking = async (req, res) => {
 exports.upsertWebsiteContact = async (req, res) => {
   try {
     const payload = req.body || {};
-    const externalContactId = String(payload.externalContactId || generateExternalId('manual-contact'));
-
-    const update = {
+    const contact = await WebsiteContact.create({
       name: payload.name || 'Website Contact',
       email: payload.email || '',
       phoneNumber: payload.phoneNumber || '',
       subject: payload.subject || '',
       message: payload.message || '',
-      source: payload.source || 'website',
-      lastSyncedAt: new Date(),
-    };
+    });
 
-    const contact = await WebsiteContact.findOneAndUpdate(
-      { externalContactId },
-      { $set: update },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
-    );
-
-    return res.status(200).json({ success: true, contact });
+    return res.status(201).json({ success: true, contact });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -158,9 +172,11 @@ exports.upsertWebsiteContact = async (req, res) => {
 exports.getWebsiteUsers = async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
-    const filter = { source: 'website' };
+    const filter = websiteUserFilter();
     const searchFilter = buildSearch(req.query.search, ['name', 'email', 'phoneNumber', 'address']);
-    if (searchFilter) Object.assign(filter, searchFilter);
+    if (searchFilter) {
+      filter.$and = [searchFilter];
+    }
 
     const [total, users] = await Promise.all([
       WebsiteUser.countDocuments(filter),
@@ -182,14 +198,13 @@ exports.getWebsiteUsers = async (req, res) => {
 exports.getWebsiteOrders = async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
-    const filter = { source: 'website' };
+    const filter = {};
 
     if (req.query.status) {
       filter.status = req.query.status;
     }
 
     const searchFilter = buildSearch(req.query.search, [
-      'externalOrderId',
       'customerName',
       'customerEmail',
       'customerPhone',
@@ -217,7 +232,7 @@ exports.getWebsiteOrders = async (req, res) => {
 exports.getWebsiteBookings = async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
-    const filter = { source: 'website' };
+    const filter = {};
     const searchFilter = buildSearch(req.query.search, ['serviceName', 'customerName', 'email', 'phoneNumber']);
     if (searchFilter) Object.assign(filter, searchFilter);
 
@@ -241,7 +256,7 @@ exports.getWebsiteBookings = async (req, res) => {
 exports.getWebsiteContacts = async (req, res) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
-    const filter = { source: 'website' };
+    const filter = {};
     const searchFilter = buildSearch(req.query.search, ['name', 'email', 'phoneNumber', 'subject', 'message']);
     if (searchFilter) Object.assign(filter, searchFilter);
 
@@ -265,12 +280,12 @@ exports.getWebsiteContacts = async (req, res) => {
 exports.getWebsiteSyncStats = async (_req, res) => {
   try {
     const [users, orders, bookings, contacts, revenueAgg] = await Promise.all([
-      WebsiteUser.countDocuments({ source: 'website' }),
-      WebsiteOrder.countDocuments({ source: 'website' }),
-      WebsiteBooking.countDocuments({ source: 'website' }),
-      WebsiteContact.countDocuments({ source: 'website' }),
+      WebsiteUser.countDocuments(websiteUserFilter()),
+      WebsiteOrder.countDocuments({}),
+      WebsiteBooking.countDocuments({}),
+      WebsiteContact.countDocuments({}),
       WebsiteOrder.aggregate([
-        { $match: { source: 'website' } },
+        { $match: {} },
         { $group: { _id: null, totalRevenue: { $sum: '$totalPrice' } } },
       ]),
     ]);
@@ -301,7 +316,7 @@ exports.updateWebsiteUser = async (req, res) => {
     if (hasOwn(payload, 'isAdmin')) update.isAdmin = Boolean(payload.isAdmin);
 
     const user = await WebsiteUser.findOneAndUpdate(
-      { _id: req.params.id, source: 'website' },
+      { _id: req.params.id },
       { $set: update },
       { new: true, runValidators: true }
     );
@@ -318,7 +333,7 @@ exports.updateWebsiteUser = async (req, res) => {
 
 exports.deleteWebsiteUser = async (req, res) => {
   try {
-    const user = await WebsiteUser.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    const user = await WebsiteUser.findOneAndDelete({ _id: req.params.id });
     if (!user) {
       return res.status(404).json({ success: false, message: 'Website user not found' });
     }
@@ -348,7 +363,7 @@ exports.updateWebsiteOrder = async (req, res) => {
     if (hasOwn(payload, 'shippingAddress')) update.shippingAddress = payload.shippingAddress || {};
 
     const order = await WebsiteOrder.findOneAndUpdate(
-      { _id: req.params.id, source: 'website' },
+      { _id: req.params.id },
       { $set: update },
       { new: true, runValidators: true }
     );
@@ -365,7 +380,7 @@ exports.updateWebsiteOrder = async (req, res) => {
 
 exports.deleteWebsiteOrder = async (req, res) => {
   try {
-    const order = await WebsiteOrder.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    const order = await WebsiteOrder.findOneAndDelete({ _id: req.params.id });
     if (!order) {
       return res.status(404).json({ success: false, message: 'Website order not found' });
     }
@@ -392,7 +407,7 @@ exports.updateWebsiteBooking = async (req, res) => {
     if (hasOwn(payload, 'notes')) update.notes = payload.notes || '';
 
     const booking = await WebsiteBooking.findOneAndUpdate(
-      { _id: req.params.id, source: 'website' },
+      { _id: req.params.id },
       { $set: update },
       { new: true, runValidators: true }
     );
@@ -409,7 +424,7 @@ exports.updateWebsiteBooking = async (req, res) => {
 
 exports.deleteWebsiteBooking = async (req, res) => {
   try {
-    const booking = await WebsiteBooking.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    const booking = await WebsiteBooking.findOneAndDelete({ _id: req.params.id });
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Website booking not found' });
     }
@@ -422,7 +437,7 @@ exports.deleteWebsiteBooking = async (req, res) => {
 exports.updateWebsiteContact = async (req, res) => {
   try {
     const payload = req.body || {};
-    const update = { lastSyncedAt: new Date() };
+    const update = {};
 
     if (hasOwn(payload, 'name')) update.name = payload.name || 'Website Contact';
     if (hasOwn(payload, 'email')) update.email = payload.email || '';
@@ -431,7 +446,7 @@ exports.updateWebsiteContact = async (req, res) => {
     if (hasOwn(payload, 'message')) update.message = payload.message || '';
 
     const contact = await WebsiteContact.findOneAndUpdate(
-      { _id: req.params.id, source: 'website' },
+      { _id: req.params.id },
       { $set: update },
       { new: true, runValidators: true }
     );
@@ -448,7 +463,7 @@ exports.updateWebsiteContact = async (req, res) => {
 
 exports.deleteWebsiteContact = async (req, res) => {
   try {
-    const contact = await WebsiteContact.findOneAndDelete({ _id: req.params.id, source: 'website' });
+    const contact = await WebsiteContact.findOneAndDelete({ _id: req.params.id });
     if (!contact) {
       return res.status(404).json({ success: false, message: 'Website contact not found' });
     }

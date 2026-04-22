@@ -27,6 +27,10 @@ const UserSchema = new mongoose.Schema(
       enum: ['admin', 'agent'],
       default: 'agent',
     },
+    isAdmin: {
+      type: Boolean,
+      default: false,
+    },
     isActive: {
       type: Boolean,
       default: true,

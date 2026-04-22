@@ -18,6 +18,7 @@ const bootstrapAdminFromEnv = async () => {
       email: adminEmail,
       password: adminPassword,
       role: 'admin',
+      isAdmin: true,
       isActive: true,
     });
     console.log(`Admin bootstrap: created admin user ${adminEmail}`);
@@ -28,6 +29,11 @@ const bootstrapAdminFromEnv = async () => {
 
   if (adminUser.role !== 'admin') {
     adminUser.role = 'admin';
+    shouldSave = true;
+  }
+
+  if (!adminUser.isAdmin) {
+    adminUser.isAdmin = true;
     shouldSave = true;
   }
 

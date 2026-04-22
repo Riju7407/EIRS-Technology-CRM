@@ -52,6 +52,12 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
 // Determine the correct path for client build
 // Works both locally and on Render/Vercel
 const clientBuildPath = path.resolve(__dirname, '../client/dist');

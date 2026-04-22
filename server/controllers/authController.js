@@ -29,6 +29,7 @@ exports.register = async (req, res) => {
 
 // @desc    Login user
 // @route   POST /api/auth/login
+// @route   POST /api/auth/signin
 // @access  Public
 exports.login = async (req, res) => {
   try {
@@ -55,10 +56,11 @@ exports.login = async (req, res) => {
       success: true,
       message: 'Logged in successfully',
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      data: { id: user._id, name: user.name, email: user.email, role: user.role, isAdmin: user.isAdmin },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('[authController.login] Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error during login' });
   }
 };
 

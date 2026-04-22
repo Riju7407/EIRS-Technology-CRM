@@ -5,6 +5,7 @@ const { protect, authorize } = require('../middleware/auth');
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/signin', login); // Alias for login endpoint
 router.get('/me', protect, getMe);
 router.put('/updatepassword', protect, updatePassword);
 router.get('/users', protect, authorize('admin'), getAllUsers);

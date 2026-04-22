@@ -15,23 +15,23 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await API.post('/auth/signin', { email, password });
-      const backendUser = data?.data || {};
       const token = data?.token;
+      const backendUser = data?.data || {};
 
-      if (!token || !backendUser?._id) {
+      if (!token || !backendUser?.id) {
         throw new Error('Invalid login response from server');
       }
 
-      if (!backendUser.isAdmin) {
+      if (!backendUser.isAdmin && backendUser.role !== 'admin') {
         throw new Error('Only admin users can access CRM');
       }
 
       const normalizedUser = {
-        id: backendUser._id,
+        id: backendUser.id,
         name: backendUser.name,
         email: backendUser.email,
-        isAdmin: Boolean(backendUser.isAdmin),
-        role: backendUser.isAdmin ? 'admin' : 'user',
+        isAdmin: Boolean(backendUser.isAdmin || backendUser.role === 'admin'),
+        role: backendUser.role || 'admin',
       };
 
       localStorage.setItem('crm_token', token);
@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       const msg = error.response?.data?.message || error.message || 'Login failed';
       toast.error(msg);
+      console.error('Login error:', error);
       return { success: false, message: msg };
     } finally {
       setLoading(false);

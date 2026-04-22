@@ -4,6 +4,6 @@
  * It imports the Express app from the server and exports it as a handler
  */
 
-const app = require('./server/server');
+const app = require('../server/server');
 
 module.exports = app;

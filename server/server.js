@@ -18,6 +18,18 @@ if (fs.existsSync(envPath)) {
   dotenv.config();
 }
 
+// Validate required environment variables
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error(`❌ Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  console.error('Please set these variables in your Vercel dashboard or .env file');
+  if (!process.env.VERCEL) {
+    process.exit(1);
+  }
+}
+
 const app = express();
 
 // Enhanced CORS for Vercel deployment

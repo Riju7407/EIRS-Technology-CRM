@@ -108,6 +108,22 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'EIRS CRM API is running', timestamp: new Date() });
 });
 
+// Debug endpoint - show environment configuration
+app.get('/api/debug/config', (req, res) => {
+  res.json({
+    success: true,
+    environment: {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      MONGO_CONNECTED: !!process.env.MONGO_URI,
+      JWT_SECRET_SET: !!process.env.JWT_SECRET,
+      ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+      VERCEL: process.env.VERCEL || 'false',
+      timestamp: new Date()
+    }
+  });
+});
+
 // Serve index.html for SPA routing (must be before error handler)
 if (fs.existsSync(clientBuildPath)) {
   app.get('*', (req, res) => {

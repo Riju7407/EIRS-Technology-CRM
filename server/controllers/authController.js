@@ -40,17 +40,22 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
+    console.log(`[LOGIN] Attempting login for: ${normalizedEmail}`);
+
     const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user || !user.isActive) {
+      console.log(`[LOGIN] User not found or inactive: ${normalizedEmail}`);
       return res.status(401).json({ success: false, message: 'Invalid credentials or account deactivated' });
     }
 
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
+      console.log(`[LOGIN] Password mismatch for: ${normalizedEmail}`);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     const token = user.getSignedJwtToken();
+    console.log(`[LOGIN] ✓ Successful login for: ${normalizedEmail}`);
 
     res.status(200).json({
       success: true,
@@ -59,7 +64,8 @@ exports.login = async (req, res) => {
       data: { id: user._id, name: user.name, email: user.email, role: user.role, isAdmin: user.isAdmin },
     });
   } catch (error) {
-    console.error('[authController.login] Error:', error);
+    console.error('[authController.login] ❌ Error:', error.message);
+    console.error('[authController.login] Stack:', error.stack);
     res.status(500).json({ success: false, message: error.message || 'Server error during login' });
   }
 };

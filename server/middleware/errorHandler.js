@@ -2,9 +2,12 @@ const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log to console for dev
+  // Always log errors in production and dev for debugging
+  console.error(`[ERROR] ${req.method} ${req.path}`);
+  console.error(`[ERROR] Name: ${err.name}`);
+  console.error(`[ERROR] Message: ${err.message}`);
   if (process.env.NODE_ENV === 'development') {
-    console.error(err);
+    console.error(`[ERROR] Stack:`, err.stack);
   }
 
   // Mongoose bad ObjectId

@@ -28,6 +28,7 @@ const corsOptions = {
       'http://localhost:3001',
       'http://192.168.0.147:3000',
       'https://eirs-technology-crm.vercel.app',
+      'https://crm.eirstechnology.com',
       /^https:\/\/.*\.vercel\.app$/
     ];
     

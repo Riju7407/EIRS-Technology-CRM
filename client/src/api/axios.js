@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+const productionApiUrl = 'https://eirs-technology-crm.vercel.app/api';
+
 // Determine API base URL based on environment
 const getAPIUrl = () => {
   const envApiUrl = import.meta.env.VITE_API_BASE_URL;
@@ -14,9 +16,8 @@ const getAPIUrl = () => {
     return '/api';
   }
 
-  // In production, use relative path so frontend and backend are on same origin
-  // This allows the EIRS-CRM to work when served from the same server
-  return '/api';
+  // In production, point to the deployed CRM backend unless an env override is provided.
+  return productionApiUrl;
 };
 
 const API = axios.create({

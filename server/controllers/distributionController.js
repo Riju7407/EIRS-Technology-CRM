@@ -80,7 +80,7 @@ exports.getDistributions = async (req, res) => {
 // @access  Private/Admin
 exports.createDistribution = async (req, res) => {
   try {
-    const { prospect, assignedTo, status, priority, dueDate, notes } = req.body;
+    const { prospect, assignedTo, status, priority, startingDate, dueDate, notes } = req.body;
 
     if (!prospect || !assignedTo) {
       return res.status(400).json({ success: false, message: 'Prospect and employee are required' });
@@ -107,7 +107,8 @@ exports.createDistribution = async (req, res) => {
       assignedTo,
       assignedBy: req.user.id,
       status: status || 'assigned',
-      priority: priority || 'medium',
+      priority: priority || 'moderate',
+      startingDate: startingDate || undefined,
       dueDate: dueDate || undefined,
       notes,
       assignedAt: new Date(),
@@ -136,10 +137,11 @@ exports.createDistribution = async (req, res) => {
 // @access  Private/Admin
 exports.updateDistribution = async (req, res) => {
   try {
-    const { prospect, assignedTo, status, priority, dueDate, notes } = req.body;
+    const { prospect, assignedTo, status, priority, startingDate, dueDate, notes } = req.body;
     const updatePayload = {
       status,
       priority,
+      startingDate: startingDate || null,
       dueDate: dueDate || null,
       notes,
     };

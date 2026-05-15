@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext';
 const initialForm = {
   name: '',
   email: '',
+  password: '',
+  confirmPassword: '',
   phone: '',
   role: '',
   department: '',
@@ -62,6 +64,8 @@ const EmployeesPage = () => {
     setFormData({
       name: item.name || '',
       email: item.email || '',
+      password: '',
+      confirmPassword: '',
       phone: item.phone || '',
       role: item.role || '',
       department: item.department || '',
@@ -75,11 +79,28 @@ const EmployeesPage = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
+      if (!editData && !formData.password) {
+        toast.error('Password is required for a new employee login');
+        return;
+      }
+
+      if (formData.password && formData.password !== formData.confirmPassword) {
+        toast.error('Passwords do not match');
+        return;
+      }
+
+      const payload = { ...formData };
+      delete payload.confirmPassword;
+
+      if (editData && !payload.password) {
+        delete payload.password;
+      }
+
       if (editData?._id) {
-        await employeeService.update(editData._id, formData);
+        await employeeService.update(editData._id, payload);
         toast.success('Employee updated successfully');
       } else {
-        await employeeService.create(formData);
+        await employeeService.create(payload);
         toast.success('Employee added successfully');
       }
       setShowForm(false);
@@ -246,6 +267,28 @@ const EmployeesPage = () => {
             <div className="form-group">
               <label className="form-label">Email</label>
               <input type="email" className="form-control" required value={formData.email} onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder={editData ? 'Leave blank to keep current password' : 'Create employee login password'}
+                value={formData.password}
+                onChange={(e) => setFormData((p) => ({ ...p, password: e.target.value }))}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Confirm Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder={editData ? 'Confirm new password only if changing it' : 'Re-enter password'}
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData((p) => ({ ...p, confirmPassword: e.target.value }))}
+              />
             </div>
           </div>
           <div className="form-row">

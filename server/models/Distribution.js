@@ -25,10 +25,11 @@ const DistributionSchema = new mongoose.Schema(
     },
     priority: {
       type: String,
-      enum: ['low', 'medium', 'high'],
-      default: 'medium',
+      enum: ['low', 'moderate', 'instant', 'medium', 'high', 'critical'],
+      default: 'moderate',
     },
     assignedAt: { type: Date, default: Date.now },
+    startingDate: { type: Date },
     dueDate: { type: Date },
     completedAt: { type: Date },
     notes: { type: String },

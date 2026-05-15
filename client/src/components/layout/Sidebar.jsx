@@ -8,32 +8,40 @@ import { useAuth } from '../../context/AuthContext';
 
 const websiteSyncModulesEnabled = String(import.meta.env.VITE_ENABLE_WEBSITE_SYNC_MODULES || 'true').toLowerCase() !== 'false';
 
-const getNavItems = (isAdmin) => [
-  { to: '/dashboard', label: 'Dashboard', icon: FiHome },
-  { to: '/clients', label: 'Clients', icon: FiUsers },
-  { to: '/customer-details', label: 'Customer Details', icon: FiUsers },
-  { to: '/purchase-history', label: 'Purchase History', icon: FiShoppingBag },
-  { to: '/bill-quotation', label: 'Bill Quotation', icon: FiFileText },
-  ...(isAdmin ? [{ to: '/saved-quotations', label: 'Saved Quotations', icon: FiDownload }] : []),
-  { to: '/followups', label: 'Follow-Ups', icon: FiCalendar },
-  { to: '/interactions', label: 'Interactions', icon: FiMessageSquare },
-  { to: '/service-management', label: 'Service Management', icon: FiUserPlus },
-  { to: '/employees', label: 'Employees', icon: FiBriefcase },
-  { to: '/distribution', label: 'Distribution', icon: FiPackage },
-  { to: '/campaigns', label: 'Campaigns', icon: FiTarget },
-  ...(websiteSyncModulesEnabled
-    ? [
-      { to: '/website-users', label: 'Website Users', icon: FiUsers },
-      { to: '/website-orders', label: 'Website Orders', icon: FiShoppingBag },
-      { to: '/website-bookings', label: 'Website Bookings', icon: FiCalendar },
-      { to: '/website-contacts', label: 'Website Contacts', icon: FiMail },
-    ]
-    : []),
-];
+const getNavItems = (role) => {
+  if (role === 'employee') {
+    return [{ to: '/employee-dashboard', label: 'My Dashboard', icon: FiHome }];
+  }
+
+  const isAdmin = role === 'admin';
+
+  return [
+    { to: '/dashboard', label: 'Dashboard', icon: FiHome },
+    { to: '/clients', label: 'Clients', icon: FiUsers },
+    { to: '/customer-details', label: 'Customer Details', icon: FiUsers },
+    { to: '/purchase-history', label: 'Purchase History', icon: FiShoppingBag },
+    { to: '/bill-quotation', label: 'Bill Quotation', icon: FiFileText },
+    ...(isAdmin ? [{ to: '/saved-quotations', label: 'Saved Quotations', icon: FiDownload }] : []),
+    { to: '/followups', label: 'Follow-Ups', icon: FiCalendar },
+    { to: '/interactions', label: 'Interactions', icon: FiMessageSquare },
+    { to: '/service-management', label: 'Service Management', icon: FiUserPlus },
+    { to: '/employees', label: 'Employees', icon: FiBriefcase },
+    { to: '/distribution', label: 'Distribution', icon: FiPackage },
+    { to: '/campaigns', label: 'Campaigns', icon: FiTarget },
+    ...(websiteSyncModulesEnabled
+      ? [
+        { to: '/website-users', label: 'Website Users', icon: FiUsers },
+        { to: '/website-orders', label: 'Website Orders', icon: FiShoppingBag },
+        { to: '/website-bookings', label: 'Website Bookings', icon: FiCalendar },
+        { to: '/website-contacts', label: 'Website Contacts', icon: FiMail },
+      ]
+      : []),
+  ];
+};
 
 const Sidebar = () => {
-  const { user, logout, isAdmin } = useAuth();
-  const navItems = getNavItems(isAdmin);
+  const { user, logout } = useAuth();
+  const navItems = getNavItems(user?.role);
 
   return (
     <aside className="sidebar">

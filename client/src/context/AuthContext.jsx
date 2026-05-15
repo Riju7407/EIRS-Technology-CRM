@@ -22,10 +22,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid login response from server');
       }
 
-      if (!backendUser.isAdmin && backendUser.role !== 'admin') {
-        throw new Error('Only admin users can access CRM');
-      }
-
       const normalizedUser = {
         id: backendUser.id,
         name: backendUser.name,
@@ -38,7 +34,11 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('crm_user', JSON.stringify(normalizedUser));
       setUser(normalizedUser);
       toast.success(`Welcome back, ${normalizedUser.name}!`);
-      return { success: true };
+      return {
+        success: true,
+        redirectTo: normalizedUser.role === 'employee' ? '/employee-dashboard' : '/dashboard',
+        user: normalizedUser,
+      };
     } catch (error) {
       const msg = error.response?.data?.message || error.message || 'Login failed';
       toast.error(msg);
@@ -57,9 +57,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'admin');
+  const isEmployee = user?.role === 'employee';
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isEmployee }}>
       {children}
     </AuthContext.Provider>
   );

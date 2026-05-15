@@ -11,7 +11,8 @@ const statusMap = {
   open: 'badge-danger', resolved: 'badge-success', closed: 'badge-secondary',
   escalated: 'badge-warning',
   // Priority
-  low: 'badge-secondary', medium: 'badge-info', high: 'badge-warning', critical: 'badge-danger',
+  low: 'badge-secondary', moderate: 'badge-info', instant: 'badge-danger',
+  medium: 'badge-info', high: 'badge-warning', critical: 'badge-danger',
   // Purchase
   pending: 'badge-warning', refunded: 'badge-purple',
 };

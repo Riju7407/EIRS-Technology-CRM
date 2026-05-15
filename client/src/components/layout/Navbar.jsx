@@ -13,6 +13,7 @@ const pageTitles = {
   '/interactions': 'Interaction Logs',
   '/service-management': 'Service Management',
   '/employees': 'Employees Management',
+  '/employee-dashboard': 'Employee Dashboard',
   '/distribution': 'Distribution Management',
   '/campaigns': 'Campaigns Management',
   '/website-users': 'Website Users',
@@ -58,7 +59,7 @@ const Navbar = () => {
           <span>{user?.name}</span>
           <span
             style={{
-              backgroundColor: user?.role === 'admin' ? 'var(--primary)' : 'var(--success)',
+              backgroundColor: user?.role === 'admin' ? 'var(--primary)' : user?.role === 'employee' ? 'var(--warning)' : 'var(--success)',
               color: '#fff',
               padding: '2px 7px',
               borderRadius: 10,

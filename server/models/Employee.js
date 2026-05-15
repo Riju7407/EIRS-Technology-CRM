@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const EmployeeSchema = new mongoose.Schema(
   {
@@ -9,6 +10,12 @@ const EmployeeSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
+    },
+    password: {
+      type: String,
+      required: false,
+      minlength: 6,
+      select: false,
     },
     phone: { type: String },
     role: { type: String, required: [true, 'Role is required'], trim: true },
@@ -27,5 +34,16 @@ const EmployeeSchema = new mongoose.Schema(
 );
 
 EmployeeSchema.index({ name: 'text', email: 'text', role: 'text', region: 'text' });
+
+EmployeeSchema.pre('save', async function (next) {
+  if (!this.isModified('password') || !this.password) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+EmployeeSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 module.exports = mongoose.model('Employee', EmployeeSchema);

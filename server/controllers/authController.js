@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Employee = require('../models/Employee');
 
 // @desc    Register a new admin/agent
 // @route   POST /api/auth/register
@@ -42,7 +43,35 @@ exports.login = async (req, res) => {
 
     console.log(`[LOGIN] Attempting login for: ${normalizedEmail}`);
 
-    const user = await User.findOne({ email: normalizedEmail }).select('+password');
+    let user = await User.findOne({ email: normalizedEmail }).select('+password');
+
+    if (!user) {
+      const employee = await Employee.findOne({
+        email: normalizedEmail,
+        isDeleted: { $ne: true },
+      }).select('+password');
+
+      if (!employee || !employee.password) {
+        console.log(`[LOGIN] User not found or inactive: ${normalizedEmail}`);
+        return res.status(401).json({ success: false, message: 'Invalid credentials or account deactivated' });
+      }
+
+      const employeePasswordMatch = await employee.matchPassword(password);
+      if (!employeePasswordMatch) {
+        console.log(`[LOGIN] Password mismatch for employee: ${normalizedEmail}`);
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
+
+      user = await User.create({
+        name: employee.name,
+        email: employee.email,
+        password,
+        role: 'employee',
+        isAdmin: false,
+        isActive: employee.status !== 'inactive',
+      });
+    }
+
     if (!user || !user.isActive) {
       console.log(`[LOGIN] User not found or inactive: ${normalizedEmail}`);
       return res.status(401).json({ success: false, message: 'Invalid credentials or account deactivated' });

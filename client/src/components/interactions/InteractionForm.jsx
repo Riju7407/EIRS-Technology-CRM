@@ -6,8 +6,18 @@ import { clientService } from '../../services/clientService';
 
 const defaultForm = {
   client: '', type: 'call', subject: '', description: '',
-  channel: 'phone', priority: 'medium', status: 'open',
+  channel: 'phone', priority: 'moderate', status: 'open',
   sentiment: 'neutral', tags: '', resolution: '',
+};
+
+const PRIORITY_OPTIONS = ['low', 'moderate', 'instant'];
+
+const normalizePriority = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'medium') return 'moderate';
+  if (normalized === 'high' || normalized === 'critical') return 'instant';
+  if (normalized === 'low' || normalized === 'moderate' || normalized === 'instant') return normalized;
+  return 'moderate';
 };
 
 const InteractionForm = ({ isOpen, onClose, editData, preselectedClient, onSaved }) => {
@@ -25,6 +35,7 @@ const InteractionForm = ({ isOpen, onClose, editData, preselectedClient, onSaved
         ...editData,
         client: editData.client?._id || editData.client || '',
         tags: editData.tags?.join(', ') || '',
+        priority: normalizePriority(editData.priority),
       });
     } else {
       setForm({ ...defaultForm, client: preselectedClient || '' });
@@ -117,7 +128,7 @@ const InteractionForm = ({ isOpen, onClose, editData, preselectedClient, onSaved
           <div className="form-group">
             <label className="form-label">Priority</label>
             <select className="form-control" name="priority" value={form.priority} onChange={handleChange}>
-              {['low', 'medium', 'high', 'critical'].map((p) => (
+              {PRIORITY_OPTIONS.map((p) => (
                 <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
               ))}
             </select>

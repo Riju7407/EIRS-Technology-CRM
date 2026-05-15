@@ -12,9 +12,20 @@ const initialForm = {
   prospect: '',
   assignedTo: '',
   status: 'assigned',
-  priority: 'medium',
+  priority: 'moderate',
+  startingDate: '',
   dueDate: '',
   notes: '',
+};
+
+const PRIORITY_OPTIONS = ['low', 'moderate', 'instant'];
+
+const normalizePriority = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized === 'medium') return 'moderate';
+  if (normalized === 'high' || normalized === 'critical') return 'instant';
+  if (normalized === 'low' || normalized === 'moderate' || normalized === 'instant') return normalized;
+  return 'moderate';
 };
 
 const DistributionPage = () => {
@@ -75,7 +86,8 @@ const DistributionPage = () => {
       prospect: item.prospect?._id || item.prospect || '',
       assignedTo: item.assignedTo?._id || item.assignedTo || '',
       status: item.status || 'assigned',
-      priority: item.priority || 'medium',
+      priority: normalizePriority(item.priority),
+      startingDate: item.startingDate ? new Date(item.startingDate).toISOString().slice(0, 10) : '',
       dueDate: item.dueDate ? new Date(item.dueDate).toISOString().slice(0, 10) : '',
       notes: item.notes || '',
     });
@@ -90,6 +102,7 @@ const DistributionPage = () => {
         assignedTo: formData.assignedTo,
         status: formData.status,
         priority: formData.priority,
+        startingDate: formData.startingDate || undefined,
         dueDate: formData.dueDate || undefined,
         notes: formData.notes,
       };
@@ -244,7 +257,7 @@ const DistributionPage = () => {
                       </td>
                       <td>{item.assignedBy?.name || '—'}</td>
                       <td><span className={`badge ${item.status === 'converted' || item.status === 'closed' ? 'badge-success' : item.status === 'contacted' ? 'badge-info' : item.status === 'in_progress' ? 'badge-warning' : 'badge-primary'}`}>{item.status.replace('_', ' ')}</span></td>
-                      <td><span className={`badge ${item.priority === 'high' ? 'badge-danger' : item.priority === 'medium' ? 'badge-warning' : 'badge-secondary'}`}>{item.priority}</span></td>
+                      <td><span className={`badge ${normalizePriority(item.priority) === 'instant' ? 'badge-danger' : normalizePriority(item.priority) === 'moderate' ? 'badge-warning' : 'badge-secondary'}`}>{normalizePriority(item.priority)}</span></td>
                       <td>{item.assignedAt ? new Date(item.assignedAt).toLocaleDateString() : '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
@@ -324,11 +337,15 @@ const DistributionPage = () => {
             <div className="form-group">
               <label className="form-label">Priority</label>
               <select className="form-control" value={formData.priority} onChange={(e) => setFormData((p) => ({ ...p, priority: e.target.value }))}>
-                {['low', 'medium', 'high'].map((priority) => (
-                  <option key={priority} value={priority}>{priority}</option>
+                {PRIORITY_OPTIONS.map((priority) => (
+                  <option key={priority} value={priority}>{priority.charAt(0).toUpperCase() + priority.slice(1)}</option>
                 ))}
               </select>
             </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Starting Date</label>
+            <input type="date" className="form-control" value={formData.startingDate} onChange={(e) => setFormData((p) => ({ ...p, startingDate: e.target.value }))} />
           </div>
           <div className="form-group">
             <label className="form-label">Due Date</label>

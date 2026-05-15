@@ -13,7 +13,7 @@ const LoginPage = () => {
     const result = await login(form.email, form.password);
     if (result.success) {
       prefetchPostLoginRoutes();
-      navigate('/dashboard');
+      navigate(result.redirectTo || '/dashboard');
     }
   };
 

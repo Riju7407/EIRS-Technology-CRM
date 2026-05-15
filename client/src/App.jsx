@@ -1,7 +1,8 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import PrivateRoute from './components/common/PrivateRoute';
 import Layout from './components/layout/Layout';
 import Spinner from './components/common/Spinner';
@@ -18,6 +19,7 @@ const SavedQuotationsPage = lazy(() => import('./pages/SavedQuotationsPage'));
 const CustomerDetailsPage = lazy(() => import('./pages/CustomerDetailsPage'));
 const PurchaseHistoryPage = lazy(() => import('./pages/PurchaseHistoryPage'));
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage'));
+const EmployeeDashboardPage = lazy(() => import('./pages/EmployeeDashboardPage'));
 const DistributionPage = lazy(() => import('./pages/DistributionPage'));
 const CampaignsPage = lazy(() => import('./pages/CampaignsPage'));
 const WebsiteUsersPage = lazy(() => import('./pages/WebsiteUsersPage'));
@@ -26,6 +28,30 @@ const WebsiteBookingsPage = lazy(() => import('./pages/WebsiteBookingsPage'));
 const WebsiteContactsPage = lazy(() => import('./pages/WebsiteContactsPage'));
 
 const websiteSyncModulesEnabled = String(import.meta.env.VITE_ENABLE_WEBSITE_SYNC_MODULES || 'true').toLowerCase() !== 'false';
+
+function RoleBasedHome() {
+  const { user } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={user.role === 'employee' ? '/employee-dashboard' : '/dashboard'} replace />;
+}
+
+function AdminOnlyRoute() {
+  const { user, isAdmin } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/employee-dashboard" replace />;
+  }
+
+  return <Outlet />;
+}
 
 function App() {
   return (
@@ -49,31 +75,34 @@ function App() {
                 </PrivateRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="clients" element={<ClientsPage />} />
-              <Route path="clients/:id" element={<ClientDetailPage />} />
-              <Route path="customer-details" element={<CustomerDetailsPage />} />
-              <Route path="purchase-history" element={<PurchaseHistoryPage />} />
-              <Route path="bill-quotation" element={<BillQuotationPage />} />
-              <Route path="saved-quotations" element={<SavedQuotationsPage />} />
-              <Route path="followups" element={<FollowUpsPage />} />
-              <Route path="interactions" element={<InteractionsPage />} />
-              <Route path="service-management" element={<ProspectsPage />} />
-              <Route path="prospects" element={<Navigate to="/service-management" replace />} />
-              <Route path="employees" element={<EmployeesPage />} />
-              <Route path="distribution" element={<DistributionPage />} />
-              <Route path="campaigns" element={<CampaignsPage />} />
-              {websiteSyncModulesEnabled && (
-                <>
-                  <Route path="website-users" element={<WebsiteUsersPage />} />
-                  <Route path="website-orders" element={<WebsiteOrdersPage />} />
-                  <Route path="website-bookings" element={<WebsiteBookingsPage />} />
-                  <Route path="website-contacts" element={<WebsiteContactsPage />} />
-                </>
-              )}
+              <Route index element={<RoleBasedHome />} />
+              <Route path="employee-dashboard" element={<EmployeeDashboardPage />} />
+              <Route element={<AdminOnlyRoute />}>
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="clients" element={<ClientsPage />} />
+                <Route path="clients/:id" element={<ClientDetailPage />} />
+                <Route path="customer-details" element={<CustomerDetailsPage />} />
+                <Route path="purchase-history" element={<PurchaseHistoryPage />} />
+                <Route path="bill-quotation" element={<BillQuotationPage />} />
+                <Route path="saved-quotations" element={<SavedQuotationsPage />} />
+                <Route path="followups" element={<FollowUpsPage />} />
+                <Route path="interactions" element={<InteractionsPage />} />
+                <Route path="service-management" element={<ProspectsPage />} />
+                <Route path="prospects" element={<Navigate to="/service-management" replace />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="distribution" element={<DistributionPage />} />
+                <Route path="campaigns" element={<CampaignsPage />} />
+                {websiteSyncModulesEnabled && (
+                  <>
+                    <Route path="website-users" element={<WebsiteUsersPage />} />
+                    <Route path="website-orders" element={<WebsiteOrdersPage />} />
+                    <Route path="website-bookings" element={<WebsiteBookingsPage />} />
+                    <Route path="website-contacts" element={<WebsiteContactsPage />} />
+                  </>
+                )}
+              </Route>
             </Route>
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<RoleBasedHome />} />
           </Routes>
         </Suspense>
       </Router>

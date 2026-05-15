@@ -57,6 +57,72 @@ exports.getMyEmployeeProfile = async (req, res) => {
   }
 };
 
+// @desc    Update current employee profile
+// @route   PUT /api/employees/me
+// @access  Private
+exports.updateMyEmployeeProfile = async (req, res) => {
+  try {
+    const { name, email, phone, department, region, notes, currentPassword, newPassword } = req.body;
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : undefined;
+
+    const employee = await Employee.findOne({ email: req.user.email, isDeleted: false });
+    const user = await User.findById(req.user.id).select('+password');
+
+    if (!employee || !user) {
+      return res.status(404).json({ success: false, message: 'Employee profile not found' });
+    }
+
+    if (normalizedEmail && normalizedEmail !== employee.email) {
+      const emailConflict = await Promise.all([
+        User.findOne({ email: normalizedEmail }),
+        Employee.findOne({ email: normalizedEmail, isDeleted: { $ne: true } }),
+      ]);
+
+      if (emailConflict[0] || (emailConflict[1] && String(emailConflict[1]._id) !== String(employee._id))) {
+        return res.status(400).json({ success: false, message: 'Email already in use' });
+      }
+    }
+
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: 'Current password is required to change password' });
+      }
+
+      const isMatch = await user.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+      }
+
+      user.password = newPassword;
+    }
+
+    if (name) {
+      employee.name = name;
+      user.name = name;
+    }
+    if (normalizedEmail) {
+      employee.email = normalizedEmail;
+      user.email = normalizedEmail;
+    }
+    if (phone !== undefined) employee.phone = phone;
+    if (department !== undefined) employee.department = department;
+    if (region !== undefined) employee.region = region;
+    if (notes !== undefined) employee.notes = notes;
+
+    await employee.save();
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      employee,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, isAdmin: user.isAdmin },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Create employee
 // @route   POST /api/employees
 // @access  Private

@@ -9,9 +9,15 @@ const quotationSchema = new mongoose.Schema(
     clientAddress: String,
     items: [
       {
+        itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+        itemType: String,
+        itemName: String,
         description: String,
         quantity: Number,
         rate: Number,
+        gstTaxRate: Number,
+        category: String,
+        measuringUnit: String,
       },
     ],
     discount: { type: Number, default: 0 },

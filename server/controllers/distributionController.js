@@ -1,6 +1,7 @@
 const Distribution = require('../models/Distribution');
 const Prospect = require('../models/Prospect');
 const Employee = require('../models/Employee');
+const User = require('../models/User');
 
 const escapeRegex = (text = '') => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -10,6 +11,14 @@ const generateAssignmentId = async () => {
     assignmentId: { $regex: `^ASG-${datePart}-` },
   });
   return `ASG-${datePart}-${String(count + 1).padStart(4, '0')}`;
+};
+
+const getEmployeeForUser = async (user) => {
+  if (!user) return null;
+  if (user.role === 'employee') {
+    return Employee.findOne({ email: user.email, isDeleted: { $ne: true } });
+  }
+  return null;
 };
 
 // @desc    Get all distributions
@@ -70,6 +79,115 @@ exports.getDistributions = async (req, res) => {
       currentPage: Number(page),
       distributions,
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get current employee assignments
+// @route   GET /api/distribution/my
+// @access  Private/Employee
+exports.getMyDistributions = async (req, res) => {
+  try {
+    const employee = await getEmployeeForUser(req.user);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee profile not found' });
+    }
+
+    const { status, search, page = 1, limit = 10 } = req.query;
+    const query = { isDeleted: false, assignedTo: employee._id };
+
+    if (status) query.status = status;
+
+    if (search) {
+      const regex = new RegExp(escapeRegex(search), 'i');
+      const matchedProspects = await Prospect.find({
+        isDeleted: false,
+        $or: [
+          { firstName: { $regex: regex } },
+          { lastName: { $regex: regex } },
+          { email: { $regex: regex } },
+          { phone: { $regex: regex } },
+          { company: { $regex: regex } },
+        ],
+      }).select('_id');
+
+      query.$or = [
+        { assignmentId: { $regex: regex } },
+        { notes: { $regex: regex } },
+        { prospect: { $in: matchedProspects.map((item) => item._id) } },
+      ];
+    }
+
+    const total = await Distribution.countDocuments(query);
+    const distributions = await Distribution.find(query)
+      .populate('prospect', 'firstName lastName email phone company stage')
+      .populate('assignedTo', 'name email role department region')
+      .populate('assignedBy', 'name email role')
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit));
+
+    res.status(200).json({
+      success: true,
+      count: distributions.length,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+      distributions,
+      employee: { id: employee._id, name: employee.name, email: employee.email, role: employee.role },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Update own assignment status
+// @route   PUT /api/distribution/my/:id
+// @access  Private/Employee
+exports.updateMyDistribution = async (req, res) => {
+  try {
+    const employee = await getEmployeeForUser(req.user);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee profile not found' });
+    }
+
+    const distribution = await Distribution.findOne({
+      _id: req.params.id,
+      isDeleted: false,
+      assignedTo: employee._id,
+    });
+
+    if (!distribution) {
+      return res.status(404).json({ success: false, message: 'Assignment not found' });
+    }
+
+    const { status, notes } = req.body;
+    const allowedStatuses = ['assigned', 'in_progress', 'contacted', 'converted', 'closed'];
+
+    if (status && !allowedStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    if (status) {
+      distribution.status = status;
+      if (status === 'converted' || status === 'closed') {
+        distribution.completedAt = new Date();
+      }
+    }
+
+    if (notes !== undefined) {
+      distribution.notes = notes;
+    }
+
+    await distribution.save();
+
+    const populatedDistribution = await Distribution.findById(distribution._id)
+      .populate('prospect', 'firstName lastName email phone company stage')
+      .populate('assignedTo', 'name email role department region')
+      .populate('assignedBy', 'name email role');
+
+    res.status(200).json({ success: true, message: 'Assignment updated successfully', distribution: populatedDistribution });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

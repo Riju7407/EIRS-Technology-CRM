@@ -56,11 +56,20 @@ export const AuthProvider = ({ children }) => {
     toast.success('Logged out successfully');
   }, []);
 
+  const updateUser = useCallback((updates) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const nextUser = { ...prev, ...updates };
+      localStorage.setItem('crm_user', JSON.stringify(nextUser));
+      return nextUser;
+    });
+  }, []);
+
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'admin');
   const isEmployee = user?.role === 'employee';
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isEmployee }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isAdmin, isEmployee }}>
       {children}
     </AuthContext.Provider>
   );

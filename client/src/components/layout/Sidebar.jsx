@@ -21,6 +21,7 @@ const getNavItems = (role) => {
     { to: '/customer-details', label: 'Customer Details', icon: FiUsers },
     { to: '/purchase-history', label: 'Purchase History', icon: FiShoppingBag },
     { to: '/bill-quotation', label: 'Bill Quotation', icon: FiFileText },
+    { to: '/inventory', label: 'Inventory', icon: FiPackage },
     ...(isAdmin ? [{ to: '/saved-quotations', label: 'Saved Quotations', icon: FiDownload }] : []),
     { to: '/followups', label: 'Follow-Ups', icon: FiCalendar },
     { to: '/interactions', label: 'Interactions', icon: FiMessageSquare },

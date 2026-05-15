@@ -15,6 +15,7 @@ const FollowUpsPage = lazy(() => import('./pages/FollowUpsPage'));
 const InteractionsPage = lazy(() => import('./pages/InteractionsPage'));
 const ProspectsPage = lazy(() => import('./pages/ProspectsPage'));
 const BillQuotationPage = lazy(() => import('./pages/BillQuotationPage'));
+const InventoryPage = lazy(() => import('./pages/InventoryPage'));
 const SavedQuotationsPage = lazy(() => import('./pages/SavedQuotationsPage'));
 const CustomerDetailsPage = lazy(() => import('./pages/CustomerDetailsPage'));
 const PurchaseHistoryPage = lazy(() => import('./pages/PurchaseHistoryPage'));
@@ -84,6 +85,7 @@ function App() {
                 <Route path="customer-details" element={<CustomerDetailsPage />} />
                 <Route path="purchase-history" element={<PurchaseHistoryPage />} />
                 <Route path="bill-quotation" element={<BillQuotationPage />} />
+                <Route path="inventory" element={<InventoryPage />} />
                 <Route path="saved-quotations" element={<SavedQuotationsPage />} />
                 <Route path="followups" element={<FollowUpsPage />} />
                 <Route path="interactions" element={<InteractionsPage />} />

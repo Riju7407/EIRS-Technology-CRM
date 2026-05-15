@@ -1,13 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiDownload, FiFileText, FiPlus, FiShoppingBag, FiTrash2, FiUsers, FiSave } from 'react-icons/fi';
+import { FiDownload, FiFileText, FiPlus, FiShoppingBag, FiTrash2, FiUsers, FiSave, FiEdit2, FiLayers } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { clientService } from '../services/clientService';
 import { quotationService } from '../services/quotationService';
+import { itemService } from '../services/itemService';
+import { godownService } from '../services/godownService';
+import { categoryService } from '../services/categoryService';
 import Spinner from '../components/common/Spinner';
+import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 
 const createQuoteNumber = () => {
@@ -19,7 +23,41 @@ const createQuoteNumber = () => {
   return `EIRS/${currentYearShort}-${nextYearShort}/${sequence}`;
 };
 
-const blankItem = { description: '', quantity: 1, rate: 0 };
+const blankItem = { itemId: '', itemName: '', description: '', quantity: 1, rate: 0, gstTaxRate: 0, discountOnSalesPrice: 0, pricingMode: 'without_tax', category: '', measuringUnit: '' };
+
+const itemSections = ['Basic Details', 'Stock Details', 'Pricing Details', 'Party Wise Prices', 'Custom Fields'];
+
+const initialItemForm = {
+  itemType: 'product',
+  name: '',
+  category: '',
+  pricingBasis: '',
+  pricingMode: 'without_tax',
+  salesPrice: 0,
+  purchasePrice: 0,
+  gstTaxRate: 0,
+  discountOnSalesPrice: 0,
+  wholesaleRate: 0,
+  measuringUnit: '',
+  serviceCode: '',
+  itemCode: '',
+  hsnCode: '',
+  openingStock: 0,
+  asOfDate: '',
+  description: '',
+  godown: '',
+  remarks: '',
+  partyWisePrices: [{ partyName: '', price: 0 }],
+  customFields: [{ label: '', value: '' }],
+};
+
+const initialGodownForm = {
+  name: '',
+  streetAddress: '',
+  state: '',
+  pincode: '',
+  city: '',
+};
 
 const COMPANY = {
   name: 'EIRS TECHNOLOGY',
@@ -43,6 +81,8 @@ const BRAND_PARTNER_LOGOS = [
 ];
 
 const formatRupees = (value) => Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+const normalizeNumber = (value) => Number(value || 0);
 
 // Helper function to fetch image from URL and convert to data URL
 const fetchImageAsDataURL = async (imageUrl) => {
@@ -68,24 +108,41 @@ const BillQuotationPage = () => {
   const [clients, setClients] = useState([]);
   const [quoteNumber, setQuoteNumber] = useState(createQuoteNumber());
   const [selectedClientId, setSelectedClientId] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [taxPercent, setTaxPercent] = useState(18);
   const [notes, setNotes] = useState('Thank you for your business. This quotation is valid for 7 days.');
   const [items, setItems] = useState([blankItem]);
+  const [catalogItems, setCatalogItems] = useState([]);
+  const [godowns, setGodowns] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [showGodownModal, setShowGodownModal] = useState(false);
+  const [activeItemSection, setActiveItemSection] = useState(itemSections[0]);
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editingGodownId, setEditingGodownId] = useState(null);
+  const [itemForm, setItemForm] = useState(initialItemForm);
+  const [godownForm, setGodownForm] = useState(initialGodownForm);
 
   useEffect(() => {
-    const loadClients = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
-        const { data } = await clientService.getAll({ page: 1, limit: 500 });
-        setClients(Array.isArray(data.clients) ? data.clients : []);
+        const [clientsResponse, itemsResponse, godownsResponse, categoriesResponse] = await Promise.all([
+          clientService.getAll({ page: 1, limit: 500 }),
+          itemService.getAll({ page: 1, limit: 500 }),
+          godownService.getAll({ page: 1, limit: 500 }),
+          categoryService.getAll({ page: 1, limit: 500 }),
+        ]);
+
+        setClients(Array.isArray(clientsResponse.data.clients) ? clientsResponse.data.clients : []);
+        setCatalogItems(Array.isArray(itemsResponse.data.items) ? itemsResponse.data.items : []);
+        setGodowns(Array.isArray(godownsResponse.data.godowns) ? godownsResponse.data.godowns : []);
+        setCategories(Array.isArray(categoriesResponse.data.categories) ? categoriesResponse.data.categories : []);
       } catch (_) {
-        toast.error('Failed to load customers for quotation');
+        toast.error('Failed to load quotation data');
       }
       setLoading(false);
     };
 
-    loadClients();
+    loadData();
   }, []);
 
   const selectedClient = useMemo(
@@ -93,20 +150,37 @@ const BillQuotationPage = () => {
     [clients, selectedClientId]
   );
 
+  const itemSummary = useMemo(() => {
+    return items.reduce(
+      (accumulator, item) => {
+        const quantity = Number(item.quantity || 0);
+        const rate = Number(item.rate || 0);
+        const discountPerUnit = Number(item.discountOnSalesPrice || 0);
+        const taxRate = Number(item.gstTaxRate || 0);
+        const grossAmount = quantity * rate;
+        const discountAmount = quantity * discountPerUnit;
+        const taxableAmount = Math.max(0, grossAmount - discountAmount);
+        const taxAmount = taxableAmount * taxRate / 100;
+
+        accumulator.discount += discountAmount;
+        accumulator.tax += taxAmount;
+        return accumulator;
+      },
+      { discount: 0, tax: 0 }
+    );
+  }, [items]);
+
   const computed = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.rate || 0)), 0);
-    const safeDiscount = Math.max(0, Number(discount || 0));
-    const taxableAmount = Math.max(0, subtotal - safeDiscount);
-    const taxAmount = (taxableAmount * Number(taxPercent || 0)) / 100;
-    const total = taxableAmount + taxAmount;
-    return { subtotal, safeDiscount, taxableAmount, taxAmount, total };
-  }, [discount, items, taxPercent]);
+    const total = subtotal - itemSummary.discount + itemSummary.tax;
+    return { subtotal, total };
+  }, [items, itemSummary]);
 
   const updateItem = (index, key, value) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [key]: value } : item)));
   };
 
-  const addItem = () => {
+  const addManualLine = () => {
     setItems((prev) => [...prev, blankItem]);
   };
 
@@ -114,13 +188,248 @@ const BillQuotationPage = () => {
     setItems((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
   };
 
+  const refreshInventory = async () => {
+    const [itemsResponse, godownsResponse, categoriesResponse] = await Promise.all([
+      itemService.getAll({ page: 1, limit: 500 }),
+      godownService.getAll({ page: 1, limit: 500 }),
+      categoryService.getAll({ page: 1, limit: 500 }),
+    ]);
+    setCatalogItems(Array.isArray(itemsResponse.data.items) ? itemsResponse.data.items : []);
+    setGodowns(Array.isArray(godownsResponse.data.godowns) ? godownsResponse.data.godowns : []);
+    setCategories(Array.isArray(categoriesResponse.data.categories) ? categoriesResponse.data.categories : []);
+  };
+
+  const openCreateItemForm = () => {
+    setEditingItemId(null);
+    setItemForm({ ...initialItemForm, partyWisePrices: [{ partyName: '', price: 0 }], customFields: [{ label: '', value: '' }] });
+    setActiveItemSection(itemSections[0]);
+    setShowItemModal(true);
+  };
+
+  const openEditItemForm = (item) => {
+    setEditingItemId(item._id);
+    setItemForm({
+      itemType: item.itemType || 'product',
+      name: item.name || '',
+      category: item.category || '',
+      pricingBasis: item.pricingBasis || '',
+      pricingMode: item.pricingMode || 'without_tax',
+      salesPrice: item.salesPrice || 0,
+      purchasePrice: item.purchasePrice || 0,
+      gstTaxRate: item.gstTaxRate || 0,
+      discountOnSalesPrice: item.discountOnSalesPrice || 0,
+      wholesaleRate: item.wholesaleRate || 0,
+      measuringUnit: item.measuringUnit || '',
+      serviceCode: item.serviceCode || '',
+      itemCode: item.itemCode || '',
+      hsnCode: item.hsnCode || '',
+      openingStock: item.openingStock || 0,
+      asOfDate: item.asOfDate ? String(item.asOfDate).slice(0, 10) : '',
+      description: item.description || '',
+      godown: item.godown?._id || item.godown || '',
+      remarks: item.remarks || '',
+      partyWisePrices: item.partyWisePrices?.length ? item.partyWisePrices : [{ partyName: '', price: 0 }],
+      customFields: item.customFields?.length ? item.customFields : [{ label: '', value: '' }],
+    });
+    setActiveItemSection(itemSections[0]);
+    setShowItemModal(true);
+  };
+
+  const categoryOptions = useMemo(
+    () => categories.filter((category) => category.itemType === itemForm.itemType),
+    [categories, itemForm.itemType]
+  );
+
+  const handleItemFormChange = (field, value) => {
+    setItemForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updatePartyWisePrice = (index, field, value) => {
+    setItemForm((prev) => ({
+      ...prev,
+      partyWisePrices: prev.partyWisePrices.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)),
+    }));
+  };
+
+  const addPartyWisePriceRow = () => {
+    setItemForm((prev) => ({ ...prev, partyWisePrices: [...prev.partyWisePrices, { partyName: '', price: 0 }] }));
+  };
+
+  const removePartyWisePriceRow = (index) => {
+    setItemForm((prev) => ({
+      ...prev,
+      partyWisePrices: prev.partyWisePrices.length > 1 ? prev.partyWisePrices.filter((_, rowIndex) => rowIndex !== index) : prev.partyWisePrices,
+    }));
+  };
+
+  const updateCustomField = (index, field, value) => {
+    setItemForm((prev) => ({
+      ...prev,
+      customFields: prev.customFields.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)),
+    }));
+  };
+
+  const addCustomFieldRow = () => {
+    setItemForm((prev) => ({ ...prev, customFields: [...prev.customFields, { label: '', value: '' }] }));
+  };
+
+  const removeCustomFieldRow = (index) => {
+    setItemForm((prev) => ({
+      ...prev,
+      customFields: prev.customFields.length > 1 ? prev.customFields.filter((_, rowIndex) => rowIndex !== index) : prev.customFields,
+    }));
+  };
+
+  const saveItem = async (stayOpen = false) => {
+    if (!itemForm.name.trim()) {
+      toast.error('Item name is required');
+      return;
+    }
+
+    const payload = {
+      ...itemForm,
+      salesPrice: normalizeNumber(itemForm.salesPrice),
+      purchasePrice: normalizeNumber(itemForm.purchasePrice),
+      gstTaxRate: normalizeNumber(itemForm.gstTaxRate),
+      discountOnSalesPrice: normalizeNumber(itemForm.discountOnSalesPrice),
+      wholesaleRate: normalizeNumber(itemForm.wholesaleRate),
+      openingStock: normalizeNumber(itemForm.openingStock),
+      pricingBasis: itemForm.pricingBasis.trim(),
+      pricingMode: itemForm.pricingMode,
+      partyWisePrices: (itemForm.partyWisePrices || []).filter((row) => row.partyName || row.price),
+      customFields: (itemForm.customFields || []).filter((row) => row.label || row.value),
+      godown: itemForm.godown || undefined,
+      asOfDate: itemForm.asOfDate || undefined,
+    };
+
+    try {
+      if (editingItemId) {
+        await itemService.update(editingItemId, payload);
+        toast.success('Item updated successfully');
+      } else {
+        await itemService.create(payload);
+        toast.success('Item created successfully');
+      }
+      await refreshInventory();
+      if (stayOpen) {
+        setEditingItemId(null);
+        setItemForm({ ...initialItemForm, partyWisePrices: [{ partyName: '', price: 0 }], customFields: [{ label: '', value: '' }] });
+        setActiveItemSection(itemSections[0]);
+      } else {
+        setShowItemModal(false);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save item');
+    }
+  };
+
+  const deleteItem = async (itemId) => {
+    if (!window.confirm('Delete this item?')) return;
+    try {
+      await itemService.delete(itemId);
+      setItems((prev) => prev.filter((row) => row.itemId !== itemId));
+      await refreshInventory();
+      toast.success('Item deleted successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete item');
+    }
+  };
+
+  const openCreateGodownForm = () => {
+    setEditingGodownId(null);
+    setGodownForm(initialGodownForm);
+    setShowGodownModal(true);
+  };
+
+  const openEditGodownForm = (godown) => {
+    setEditingGodownId(godown._id);
+    setGodownForm({
+      name: godown.name || '',
+      streetAddress: godown.streetAddress || '',
+      state: godown.state || '',
+      pincode: godown.pincode || '',
+      city: godown.city || '',
+    });
+    setShowGodownModal(true);
+  };
+
+  const handleGodownFormChange = (field, value) => {
+    setGodownForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const saveGodown = async () => {
+    if (!godownForm.name.trim()) {
+      toast.error('Godown name is required');
+      return;
+    }
+
+    try {
+      if (editingGodownId) {
+        await godownService.update(editingGodownId, godownForm);
+        toast.success('Godown updated successfully');
+      } else {
+        await godownService.create(godownForm);
+        toast.success('Godown created successfully');
+      }
+      await refreshInventory();
+      setShowGodownModal(false);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save godown');
+    }
+  };
+
+  const deleteGodown = async (godownId) => {
+    if (!window.confirm('Delete this godown?')) return;
+    try {
+      await godownService.delete(godownId);
+      await refreshInventory();
+      toast.success('Godown deleted successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete godown');
+    }
+  };
+
+  const toggleCatalogItem = (catalogItem, checked) => {
+    setItems((prev) => {
+      const existingIndex = prev.findIndex((item) => item.itemId === catalogItem._id);
+      if (checked) {
+        if (existingIndex !== -1) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            itemId: catalogItem._id,
+            itemName: catalogItem.name || '',
+            description: catalogItem.name || '',
+            quantity: 1,
+            rate: Number(catalogItem.salesPrice || 0),
+            gstTaxRate: Number(catalogItem.gstTaxRate || 0),
+            discountOnSalesPrice: Number(catalogItem.discountOnSalesPrice || 0),
+            pricingMode: catalogItem.pricingMode || 'without_tax',
+            category: catalogItem.category || '',
+            measuringUnit: catalogItem.measuringUnit || '',
+          },
+        ];
+      }
+
+      if (existingIndex === -1) {
+        return prev;
+      }
+
+      return prev.filter((item) => item.itemId !== catalogItem._id);
+    });
+  };
+
+  const selectedCatalogItemIds = useMemo(() => items.filter((item) => item.itemId).map((item) => item.itemId), [items]);
+
   const saveAsPurchase = async () => {
     if (!selectedClientId) {
       toast.error('Select a customer before saving quotation');
       return;
     }
 
-    const validItems = items.filter((item) => item.description && Number(item.quantity) > 0 && Number(item.rate) >= 0);
+    const validItems = items.filter((item) => (item.itemName || item.description) && Number(item.quantity) > 0 && Number(item.rate) >= 0);
     if (!validItems.length) {
       toast.error('Add at least one valid quotation item');
       return;
@@ -149,7 +458,7 @@ const BillQuotationPage = () => {
       return;
     }
 
-    const validItems = items.filter((item) => item.description && Number(item.quantity) > 0 && Number(item.rate) >= 0);
+    const validItems = items.filter((item) => (item.itemName || item.description) && Number(item.quantity) > 0 && Number(item.rate) >= 0);
     if (!validItems.length) {
       toast.error('Add at least one valid quotation item');
       return;
@@ -161,11 +470,8 @@ const BillQuotationPage = () => {
         quoteNumber,
         clientId: selectedClientId,
         items: validItems,
-        discount: Number(discount || 0),
-        taxPercent: Number(taxPercent || 0),
         notes,
         subtotal: Number(computed.subtotal.toFixed(2)),
-        taxAmount: Number(computed.taxAmount.toFixed(2)),
         total: Number(computed.total.toFixed(2)),
         pdfData: {
           quoteNumber,
@@ -179,9 +485,10 @@ const BillQuotationPage = () => {
           ]
             .filter(Boolean)
             .join(', '),
-          items: validItems,
-          discount,
-          taxPercent,
+          items: validItems.map((item) => ({
+            ...item,
+            description: item.itemName || item.description,
+          })),
           notes,
           total: computed.total,
         },
@@ -199,8 +506,6 @@ const BillQuotationPage = () => {
   const resetQuote = () => {
     setQuoteNumber(createQuoteNumber());
     setSelectedClientId('');
-    setDiscount(0);
-    setTaxPercent(18);
     setNotes('Thank you for your business. This quotation is valid for 7 days.');
     setItems([blankItem]);
   };
@@ -211,7 +516,7 @@ const BillQuotationPage = () => {
       return;
     }
 
-    const validItems = items.filter((item) => item.description && Number(item.quantity) > 0);
+    const validItems = items.filter((item) => (item.itemName || item.description) && Number(item.quantity) > 0);
     if (!validItems.length) {
       toast.error('Add at least one item before downloading PDF');
       return;
@@ -295,8 +600,8 @@ const BillQuotationPage = () => {
         const price = Number(item.rate || 0);
         return [
           String(index + 1),
-          item.description,
-          notes || '-',
+          item.itemName || item.description,
+          item.description || item.category || '-',
           String(quantity),
           formatRupees(price),
           formatRupees(quantity * price),
@@ -432,6 +737,11 @@ const BillQuotationPage = () => {
               <FiFileText /> Saved Quotations
             </Link>
           )}
+          {isAdmin && (
+            <Link className="btn btn-secondary" to="/inventory">
+              <FiLayers /> Inventory
+            </Link>
+          )}
           <button className="btn btn-secondary" onClick={resetQuote}>New Quote</button>
           <button className="btn btn-secondary" onClick={() => window.print()}>Print</button>
           <button className="btn btn-secondary" onClick={downloadQuotationPdf}>
@@ -488,9 +798,136 @@ const BillQuotationPage = () => {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">
+          <h3>Item Catalog</h3>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary btn-sm" onClick={openCreateItemForm}>
+              <FiPlus /> Add Item
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={openCreateGodownForm}>
+              <FiLayers /> Add Godown
+            </button>
+          </div>
+        </div>
+        <div className="card-body">
+          <p style={{ marginTop: 0, marginBottom: 12, color: '#64748b' }}>
+            Select catalog items to add them directly into the quotation. Checked items will appear in the quotation PDF.
+          </p>
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Select</th>
+                  <th>Item</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Sales Price</th>
+                  <th>Stock</th>
+                  <th>Godown</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalogItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', color: '#64748b' }}>
+                      No items found. Add your first item to begin building quotations.
+                    </td>
+                  </tr>
+                ) : (
+                  catalogItems.map((catalogItem) => (
+                    <tr key={catalogItem._id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedCatalogItemIds.includes(catalogItem._id)}
+                          onChange={(event) => toggleCatalogItem(catalogItem, event.target.checked)}
+                        />
+                      </td>
+                      <td>
+                        <strong>{catalogItem.name}</strong>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>{catalogItem.itemCode || catalogItem.serviceCode || 'No code'}</div>
+                      </td>
+                      <td style={{ textTransform: 'capitalize' }}>{catalogItem.itemType}</td>
+                      <td>{catalogItem.category || 'N/A'}</td>
+                      <td>Rs {formatRupees(catalogItem.salesPrice)}</td>
+                      <td>{formatRupees(catalogItem.openingStock || 0)}</td>
+                      <td>{catalogItem.godown?.name || 'N/A'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button className="btn btn-secondary btn-icon btn-sm" onClick={() => openEditItemForm(catalogItem)} title="Edit item">
+                            <FiEdit2 size={14} />
+                          </button>
+                          <button className="btn btn-danger btn-icon btn-sm" onClick={() => deleteItem(catalogItem._id)} title="Delete item">
+                            <FiTrash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <h3>Godown Management</h3>
+          <button className="btn btn-secondary btn-sm" onClick={openCreateGodownForm}>
+            <FiPlus /> Add Godown
+          </button>
+        </div>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Street Address</th>
+                <th>City</th>
+                <th>State</th>
+                <th>Pincode</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {godowns.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', color: '#64748b' }}>
+                    No godowns available yet.
+                  </td>
+                </tr>
+              ) : (
+                godowns.map((godown) => (
+                  <tr key={godown._id}>
+                    <td><strong>{godown.name}</strong></td>
+                    <td>{godown.streetAddress || 'N/A'}</td>
+                    <td>{godown.city || 'N/A'}</td>
+                    <td>{godown.state || 'N/A'}</td>
+                    <td>{godown.pincode || 'N/A'}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-secondary btn-icon btn-sm" onClick={() => openEditGodownForm(godown)} title="Edit godown">
+                          <FiEdit2 size={14} />
+                        </button>
+                        <button className="btn btn-danger btn-icon btn-sm" onClick={() => deleteGodown(godown._id)} title="Delete godown">
+                          <FiTrash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
           <h3>Quotation Items</h3>
-          <button className="btn btn-secondary btn-sm" onClick={addItem}>
-            <FiPlus /> Add Item
+          <button className="btn btn-secondary btn-sm" onClick={addManualLine}>
+            <FiPlus /> Add Manual Line
           </button>
         </div>
         <div className="table-wrapper">
@@ -500,6 +937,8 @@ const BillQuotationPage = () => {
                 <th>Description</th>
                 <th>Qty</th>
                 <th>Rate</th>
+                  <th>Discount</th>
+                  <th>Tax</th>
                 <th>Amount</th>
                 <th>Actions</th>
               </tr>
@@ -507,12 +946,15 @@ const BillQuotationPage = () => {
             <tbody>
               {items.map((item, index) => {
                 const lineAmount = Number(item.quantity || 0) * Number(item.rate || 0);
+                  const lineDiscount = Number(item.quantity || 0) * Number(item.discountOnSalesPrice || 0);
+                  const taxableLineAmount = Math.max(0, lineAmount - lineDiscount);
+                  const lineTax = taxableLineAmount * Number(item.gstTaxRate || 0) / 100;
                 return (
                   <tr key={index}>
                     <td>
                       <input
                         className="form-control"
-                        value={item.description}
+                        value={item.itemName || item.description}
                         onChange={(event) => updateItem(index, 'description', event.target.value)}
                         placeholder="Service or product description"
                       />
@@ -535,6 +977,8 @@ const BillQuotationPage = () => {
                         onChange={(event) => updateItem(index, 'rate', Number(event.target.value || 0))}
                       />
                     </td>
+                      <td style={{ fontWeight: 600 }}>Rs {lineDiscount.toLocaleString()}</td>
+                      <td style={{ fontWeight: 600 }}>Rs {lineTax.toLocaleString()} ({Number(item.gstTaxRate || 0)}%)</td>
                     <td style={{ fontWeight: 600 }}>Rs {lineAmount.toLocaleString()}</td>
                     <td>
                       <button className="btn btn-danger btn-icon btn-sm" onClick={() => removeItem(index)} title="Remove item">
@@ -559,26 +1003,6 @@ const BillQuotationPage = () => {
         <div className="card-body quotation-summary">
           <div className="summary-controls">
             <div className="form-group">
-              <label className="form-label">Discount (Rs)</label>
-              <input
-                type="number"
-                min="0"
-                className="form-control"
-                value={discount}
-                onChange={(event) => setDiscount(Number(event.target.value || 0))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Tax (%)</label>
-              <input
-                type="number"
-                min="0"
-                className="form-control"
-                value={taxPercent}
-                onChange={(event) => setTaxPercent(Number(event.target.value || 0))}
-              />
-            </div>
-            <div className="form-group">
               <label className="form-label">Quotation Notes</label>
               <textarea className="form-control" rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} />
             </div>
@@ -586,12 +1010,251 @@ const BillQuotationPage = () => {
 
           <div className="summary-values">
             <div className="summary-row"><span>Subtotal</span><strong>Rs {computed.subtotal.toLocaleString()}</strong></div>
-            <div className="summary-row"><span>Discount</span><strong>Rs {computed.safeDiscount.toLocaleString()}</strong></div>
-            <div className="summary-row"><span>Tax</span><strong>Rs {computed.taxAmount.toLocaleString()}</strong></div>
+            <div className="summary-row"><span>Item Discount</span><strong>Rs {itemSummary.discount.toLocaleString()}</strong></div>
+            <div className="summary-row"><span>Item Tax</span><strong>Rs {itemSummary.tax.toLocaleString()}</strong></div>
             <div className="summary-row total"><span>Grand Total</span><strong>Rs {computed.total.toLocaleString()}</strong></div>
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={showItemModal}
+        onClose={() => setShowItemModal(false)}
+        title={editingItemId ? 'Edit Item' : 'Create New Item'}
+        size="xl"
+        footer={(
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', width: '100%' }}>
+            <button className="btn btn-secondary" onClick={() => setShowItemModal(false)}>
+              Cancel
+            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-secondary" onClick={() => saveItem(true)}>
+                Save & New
+              </button>
+              <button className="btn btn-primary" onClick={() => saveItem(false)}>
+                <FiSave /> Save Item
+              </button>
+            </div>
+          </div>
+        )}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          {itemSections.map((section) => (
+            <button
+              key={section}
+              type="button"
+              className={`btn btn-sm ${activeItemSection === section ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveItemSection(section)}
+            >
+              {section}
+            </button>
+          ))}
+        </div>
+
+        {activeItemSection === 'Basic Details' && (
+          <div className="quotation-grid">
+            <div className="form-group">
+              <label className="form-label">Item Type</label>
+              <select className="form-control" value={itemForm.itemType} onChange={(event) => handleItemFormChange('itemType', event.target.value)}>
+                <option value="product">Product</option>
+                <option value="service">Service</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">{itemForm.itemType === 'service' ? 'Service Name' : 'Item Name'}</label>
+              <input className="form-control" value={itemForm.name} onChange={(event) => handleItemFormChange('name', event.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <select className="form-control" value={itemForm.category} onChange={(event) => handleItemFormChange('category', event.target.value)}>
+                <option value="">Select category</option>
+                {categoryOptions.map((category) => (
+                  <option key={category._id} value={category.name}>{category.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Pricing Basis</label>
+              <input
+                className="form-control"
+                placeholder="Example: Retail, MRP, Wholesale"
+                value={itemForm.pricingBasis}
+                onChange={(event) => handleItemFormChange('pricingBasis', event.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Tax Mode</label>
+              <select className="form-control" value={itemForm.pricingMode} onChange={(event) => handleItemFormChange('pricingMode', event.target.value)}>
+                <option value="without_tax">Without Tax</option>
+                <option value="with_tax">With Tax</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {activeItemSection === 'Stock Details' && (
+          <div className="quotation-grid">
+            <div className="form-group">
+              <label className="form-label">Item Code</label>
+              <input className="form-control" value={itemForm.itemCode} onChange={(event) => handleItemFormChange('itemCode', event.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">HSN Code</label>
+              <input className="form-control" value={itemForm.hsnCode} onChange={(event) => handleItemFormChange('hsnCode', event.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Measuring Unit</label>
+              <input className="form-control" value={itemForm.measuringUnit} onChange={(event) => handleItemFormChange('measuringUnit', event.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Godown</label>
+              <select className="form-control" value={itemForm.godown} onChange={(event) => handleItemFormChange('godown', event.target.value)}>
+                <option value="">Select godown</option>
+                {godowns.map((godown) => (
+                  <option key={godown._id} value={godown._id}>{godown.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Opening Stock</label>
+              <input type="number" min="0" className="form-control" value={itemForm.openingStock} onChange={(event) => handleItemFormChange('openingStock', Number(event.target.value || 0))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">As Of Date</label>
+              <input type="date" className="form-control" value={itemForm.asOfDate} onChange={(event) => handleItemFormChange('asOfDate', event.target.value)} />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Description</label>
+              <textarea className="form-control" rows={4} value={itemForm.description} onChange={(event) => handleItemFormChange('description', event.target.value)} />
+            </div>
+            {itemForm.itemType === 'service' && (
+              <div className="form-group">
+                <label className="form-label">Service Code</label>
+                <input className="form-control" value={itemForm.serviceCode} onChange={(event) => handleItemFormChange('serviceCode', event.target.value)} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeItemSection === 'Pricing Details' && (
+          <div className="quotation-grid">
+            <div className="form-group">
+              <label className="form-label">Sales Price</label>
+              <input type="number" min="0" className="form-control" value={itemForm.salesPrice} onChange={(event) => handleItemFormChange('salesPrice', Number(event.target.value || 0))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Purchase Price</label>
+              <input type="number" min="0" className="form-control" value={itemForm.purchasePrice} onChange={(event) => handleItemFormChange('purchasePrice', Number(event.target.value || 0))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">GST Tax Rate (%)</label>
+              <input type="number" min="0" className="form-control" value={itemForm.gstTaxRate} onChange={(event) => handleItemFormChange('gstTaxRate', Number(event.target.value || 0))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Discount on Sales Price</label>
+              <input type="number" min="0" className="form-control" value={itemForm.discountOnSalesPrice} onChange={(event) => handleItemFormChange('discountOnSalesPrice', Number(event.target.value || 0))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Wholesale Rate</label>
+              <input type="number" min="0" className="form-control" value={itemForm.wholesaleRate} onChange={(event) => handleItemFormChange('wholesaleRate', Number(event.target.value || 0))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Remarks</label>
+              <textarea className="form-control" rows={4} value={itemForm.remarks} onChange={(event) => handleItemFormChange('remarks', event.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {activeItemSection === 'Party Wise Prices' && (
+          <div>
+            {itemForm.partyWisePrices.map((row, index) => (
+              <div key={`party-price-${index}`} className="quotation-grid" style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Party Name</label>
+                  <input className="form-control" value={row.partyName} onChange={(event) => updatePartyWisePrice(index, 'partyName', event.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Price</label>
+                  <input type="number" min="0" className="form-control" value={row.price} onChange={(event) => updatePartyWisePrice(index, 'price', Number(event.target.value || 0))} />
+                </div>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'end' }}>
+                  <button className="btn btn-danger btn-sm" type="button" onClick={() => removePartyWisePriceRow(index)} disabled={itemForm.partyWisePrices.length === 1}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button className="btn btn-secondary btn-sm" type="button" onClick={addPartyWisePriceRow}>
+              <FiPlus /> Add Party Price
+            </button>
+          </div>
+        )}
+
+        {activeItemSection === 'Custom Fields' && (
+          <div>
+            {itemForm.customFields.map((row, index) => (
+              <div key={`custom-field-${index}`} className="quotation-grid" style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Field Label</label>
+                  <input className="form-control" value={row.label} onChange={(event) => updateCustomField(index, 'label', event.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Field Value</label>
+                  <input className="form-control" value={row.value} onChange={(event) => updateCustomField(index, 'value', event.target.value)} />
+                </div>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'end' }}>
+                  <button className="btn btn-danger btn-sm" type="button" onClick={() => removeCustomFieldRow(index)} disabled={itemForm.customFields.length === 1}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button className="btn btn-secondary btn-sm" type="button" onClick={addCustomFieldRow}>
+              <FiPlus /> Add Custom Field
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={showGodownModal}
+        onClose={() => setShowGodownModal(false)}
+        title={editingGodownId ? 'Edit Godown' : 'Add Godown'}
+        size="lg"
+        footer={(
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', width: '100%' }}>
+            <button className="btn btn-secondary" onClick={() => setShowGodownModal(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={saveGodown}>
+              <FiSave /> Save Godown
+            </button>
+          </div>
+        )}
+      >
+        <div className="quotation-grid">
+          <div className="form-group">
+            <label className="form-label">Godown Name</label>
+            <input className="form-control" value={godownForm.name} onChange={(event) => handleGodownFormChange('name', event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Street Address</label>
+            <input className="form-control" value={godownForm.streetAddress} onChange={(event) => handleGodownFormChange('streetAddress', event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">State</label>
+            <input className="form-control" value={godownForm.state} onChange={(event) => handleGodownFormChange('state', event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Pincode</label>
+            <input className="form-control" value={godownForm.pincode} onChange={(event) => handleGodownFormChange('pincode', event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">City</label>
+            <input className="form-control" value={godownForm.city} onChange={(event) => handleGodownFormChange('city', event.target.value)} />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
